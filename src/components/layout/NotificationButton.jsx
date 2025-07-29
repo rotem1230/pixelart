@@ -30,17 +30,17 @@ export default function NotificationButton() {
 
   const loadNotifications = async () => {
     try {
-      const userData = await User.me();
+      const userData = await User.getCurrentUser();
       setUser(userData);
 
-      const messagesData = await PersonalMessage.filter(
-        { recipient_id: userData.id },
-        "-created_date",
-        10 // Get latest 10 notifications
-      );
+      const allMessages = await PersonalMessage.getAll();
+      const userMessages = allMessages
+        .filter(msg => msg.recipient_id === userData.id)
+        .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+        .slice(0, 10); // Get latest 10 notifications
 
-      setNotifications(messagesData);
-      setUnreadCount(messagesData.filter(msg => !msg.is_read).length);
+      setNotifications(userMessages);
+      setUnreadCount(userMessages.filter(msg => !msg.is_read).length);
     } catch (error) {
       console.error("Error loading notifications:", error);
     }
