@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tag as TagIcon, Palette, Users, ShieldAlert } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TagManager from "../components/settings/TagManager";
+import UserManager from "../components/settings/UserManager";
 
 export default function Settings() {
   const [user, setUser] = useState(null);
@@ -57,9 +58,9 @@ export default function Settings() {
             <TagIcon className="w-4 h-4" />
             ניהול תיוגים
           </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2" disabled>
+          <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
-            ניהול משתמשים (בקרוב)
+            ניהול משתמשים
           </TabsTrigger>
         </TabsList>
         
@@ -68,7 +69,7 @@ export default function Settings() {
         </TabsContent>
         
         <TabsContent value="users" className="mt-6">
-          {/* User management component will go here */}
+          <UserManager />
         </TabsContent>
       </Tabs>
     </div>

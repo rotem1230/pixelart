@@ -155,10 +155,17 @@ export default function Events() {
       ]);
 
       // Filter unarchived events first
-      const unarchivedEvents = eventsData.filter(event => !event.is_archived);
+      let filteredEvents = eventsData.filter(event => !event.is_archived);
+      
+      // If user is an operator, show only events assigned to them
+      if (userData?.role === 'operator') {
+        filteredEvents = filteredEvents.filter(event => 
+          event.assigned_operator_id === userData.id
+        );
+      }
       
       // Group events by their status (which should now correspond to column names)
-      const groupedEvents = unarchivedEvents.reduce((acc, event) => {
+      const groupedEvents = filteredEvents.reduce((acc, event) => {
         // If event.status is not one of the defined column names, default to the first column
         const status = columnOrder.includes(event.status) ? event.status : columnOrder[0];
         if (!acc[status]) {
@@ -214,6 +221,16 @@ export default function Events() {
   const clientMap = React.useMemo(() =>
   clients.reduce((acc, client) => ({ ...acc, [client.id]: client.name }), {}),
   [clients]);
+
+  const operatorMap = React.useMemo(() => {
+    const systemUsers = localStorage.getItem('systemUsers');
+    if (systemUsers) {
+      const users = JSON.parse(systemUsers);
+      const operators = users.filter(user => user.role === 'operator');
+      return operators.reduce((acc, operator) => ({ ...acc, [operator.id]: operator.name }), {});
+    }
+    return {};
+  }, []);
 
   const handleEventSubmit = async (eventData) => {
     try {
@@ -340,7 +357,7 @@ export default function Events() {
       await Event.update(draggableId, { status: destColumnId });
 
       // Check if event moved to "סיימתי - לבדיקה" and notify admin
-      if (destColumnId === "סיימתי - לבדיקה" && user?.role !== 'admin') {
+      if (destColumnId === "סיימתי - לבדיקה" && !['admin', 'operator'].includes(user?.role)) {
         try {
           // Mock admin users for now
           const adminUsers = [];
@@ -675,6 +692,7 @@ export default function Events() {
                           onMarkComplete={handleMarkAsCompleted}
                           tagColors={tagColors}
                           clientName={clientMap[event.client_id]} // Pass client name
+                          operatorName={operatorMap[event.assigned_operator_id]} // Pass operator name
                           statusColors={columnsConfig}
                           user={user}
                           // Timer props are handled via the modal
@@ -796,6 +814,44 @@ export default function Events() {
 
                 {selectedEvent.description &&
               <p className="text-gray-700 text-right">{selectedEvent.description}</p>
+              }
+
+                {/* Assigned Operator */}
+                {selectedEvent.assigned_operator_id && operatorMap[selectedEvent.assigned_operator_id] &&
+              <div className="border-t pt-4">
+                    <h3 className="font-semibold mb-2 text-right">מפעיל מוקצה</h3>
+                    <p className="text-gray-700 text-right">
+                      <span className="font-medium">שם: </span>
+                      {operatorMap[selectedEvent.assigned_operator_id]}
+                    </p>
+                  </div>
+              }
+
+                {/* Producer Information */}
+                {(selectedEvent.producer_name || selectedEvent.producer_phone) &&
+              <div className="border-t pt-4">
+                    <h3 className="font-semibold mb-2 text-right">פרטי מפיק</h3>
+                    {selectedEvent.producer_name &&
+                  <p className="text-gray-700 text-right mb-1">
+                        <span className="font-medium">שם: </span>
+                        {selectedEvent.producer_name}
+                      </p>
+                  }
+                    {selectedEvent.producer_phone &&
+                  <p className="text-gray-700 text-right">
+                        <span className="font-medium">טלפון: </span>
+                        <span dir="ltr">{selectedEvent.producer_phone}</span>
+                      </p>
+                  }
+                  </div>
+              }
+
+                {/* Registration Notes */}
+                {selectedEvent.registration_notes &&
+              <div className="border-t pt-4">
+                    <h3 className="font-semibold mb-2 text-right">הערות עמודת רישום</h3>
+                    <p className="text-gray-700 text-right whitespace-pre-wrap">{selectedEvent.registration_notes}</p>
+                  </div>
               }
 
                 {selectedEvent.tags && selectedEvent.tags.length > 0 &&

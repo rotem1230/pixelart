@@ -148,8 +148,14 @@ export default function PersonalSpace() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">תפקיד</label>
-                <Badge variant={user?.role === 'admin' ? 'destructive' : 'secondary'}>
-                  {user?.role === 'admin' ? 'מנהל' : 'עובד'}
+                <Badge variant={
+                  user?.role === 'admin' ? 'destructive' : 
+                  user?.role === 'operator' ? 'default' : 'secondary'
+                } className={
+                  user?.role === 'operator' ? 'bg-orange-100 text-orange-800 border-orange-200' : ''
+                }>
+                  {user?.role === 'admin' ? 'מנהל' : 
+                   user?.role === 'operator' ? 'מפעיל' : 'עובד'}
                 </Badge>
               </div>
             </CardContent>

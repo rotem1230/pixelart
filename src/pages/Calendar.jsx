@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Event } from "@/api/entities";
 import { Task } from "@/api/entities";
+import { User } from "@/api/entities";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,11 +50,22 @@ export default function CalendarPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [eventsData, tasksData] = await Promise.all([
+      const [eventsData, tasksData, userData] = await Promise.all([
         Event.getAll(),
-        Task.getAll()
+        Task.getAll(),
+        User.getCurrentUser().catch(() => null)
       ]);
-      setEvents(eventsData.filter(event => !event.is_archived));
+      
+      let filteredEvents = eventsData.filter(event => !event.is_archived);
+      
+      // If user is an operator, show only events assigned to them
+      if (userData?.role === 'operator') {
+        filteredEvents = filteredEvents.filter(event => 
+          event.assigned_operator_id === userData.id
+        );
+      }
+      
+      setEvents(filteredEvents);
       setTasks(tasksData);
     } catch (error) {
       console.error("Error loading data:", error);

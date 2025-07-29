@@ -59,7 +59,11 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
     quote_number: event?.quote_number || "",
     booking_status: event?.booking_status || "טרם החל",
     payment_status: event?.payment_status || "טרם שולם",
-    manager_checklist: event?.manager_checklist || []
+    manager_checklist: event?.manager_checklist || [],
+    producer_name: event?.producer_name || "",
+    producer_phone: event?.producer_phone || "",
+    registration_notes: event?.registration_notes || "",
+    assigned_operator_id: event?.assigned_operator_id || "none"
   });
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [newManagerChecklistItem, setNewManagerChecklistItem] = useState("");
@@ -67,6 +71,7 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
   const [availableTags, setAvailableTags] = useState([]);
   const [availableTasks, setAvailableTasks] = useState([]);
   const [availableClients, setAvailableClients] = useState(clients || []);
+  const [availableOperators, setAvailableOperators] = useState([]);
   const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
   const [newClientName, setNewClientName] = useState("");
 
@@ -78,15 +83,22 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
     const fetchData = async () => {
       try {
         const [tagsData, tasksData, clientsData] = await Promise.all([
-        Tag.list(),
-        Task.list(),
-        Client.list()]
+        Tag.getAll(),
+        Task.getAll(),
+        Client.getAll()]
         );
         setAvailableTags(tagsData);
         setAvailableTasks(tasksData);
+        
+        // Load operators from localStorage
+        const systemUsers = localStorage.getItem('systemUsers');
+        if (systemUsers) {
+          const users = JSON.parse(systemUsers);
+          const operators = users.filter(user => user.role === 'operator');
+          setAvailableOperators(operators);
+        }
+        
         // This will be overridden by the prop if `clients` prop is provided
-        // However, if the component is mounted without the `clients` prop, this ensures data is fetched.
-        // It's good practice to keep both, prioritizing props.
         if (!clients || clients.length === 0) {
           setAvailableClients(clientsData);
         }
@@ -99,7 +111,12 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    // Convert "none" back to empty string for assigned_operator_id
+    const submitData = {
+      ...formData,
+      assigned_operator_id: formData.assigned_operator_id === "none" ? "" : formData.assigned_operator_id
+    };
+    onSubmit(submitData);
   };
 
   const handleInputChange = (field, value) => {
@@ -312,7 +329,42 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
                 value={formData.location}
                 onChange={(e) => handleInputChange("location", e.target.value)}
                 placeholder="הכנס מיקום האירוע..." />
+            </div>
 
+            {/* Producer Information */}
+            <div className="space-y-2">
+              <Label htmlFor="producer_name" className="text-sm font-medium text-gray-700">
+                שם מפיק
+              </Label>
+              <Input
+                id="producer_name"
+                value={formData.producer_name}
+                onChange={(e) => handleInputChange("producer_name", e.target.value)}
+                placeholder="הכנס שם המפיק..." />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="producer_phone" className="text-sm font-medium text-gray-700">
+                טלפון מפיק
+              </Label>
+              <Input
+                id="producer_phone"
+                value={formData.producer_phone}
+                onChange={(e) => handleInputChange("producer_phone", e.target.value)}
+                placeholder="הכנס מספר טלפון המפיק..."
+                dir="ltr" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="registration_notes" className="text-sm font-medium text-gray-700">
+                הערות עמודת רישום
+              </Label>
+              <Textarea
+                id="registration_notes"
+                value={formData.registration_notes}
+                onChange={(e) => handleInputChange("registration_notes", e.target.value)}
+                placeholder="הכנס הערות לעמודת הרישום..."
+                rows={3} />
             </div>
 
             {/* Drive URL */}
@@ -480,6 +532,22 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
               <h3 className="text-lg font-semibold text-gray-800">ניהול האירוע (מנהלים)</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                {/* Assigned Operator */}
+                <div className="space-y-2">
+                  <Label>מפעיל מוקצה</Label>
+                  <Select value={formData.assigned_operator_id} onValueChange={(value) => handleInputChange("assigned_operator_id", value)}>
+                    <SelectTrigger><SelectValue placeholder="בחר מפעיל" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">ללא מפעיל מוקצה</SelectItem>
+                      {availableOperators.map((operator) => (
+                        <SelectItem key={operator.id} value={operator.id}>
+                          {operator.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="space-y-2">
                   <Label>סטטוס אישור</Label>
                   <Select value={formData.approval_status} onValueChange={(value) => handleInputChange("approval_status", value)}>

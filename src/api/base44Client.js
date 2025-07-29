@@ -15,11 +15,30 @@ class CustomSDK {
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Valid user credentials
-      const validCredentials = [
+      // Get users from localStorage (created by admin)
+      const systemUsers = localStorage.getItem('systemUsers');
+      let validCredentials = [
         { email: 'pixelartvj@gmail.com', password: 'yvj{89kN$2.8', name: 'Pixel Art VJ', role: 'admin' },
         { email: 'pixeloffice2025@gmail.com', password: 'b)W17,>1@Z2C', name: 'Pixel Office 2025', role: 'user' }
       ];
+      
+      // If system users exist, merge them with default users
+      if (systemUsers) {
+        const users = JSON.parse(systemUsers);
+        // Keep default users and add new ones
+        const newUsers = users.filter(user => 
+          !validCredentials.some(cred => cred.email === user.email)
+        );
+        validCredentials = [
+          ...validCredentials,
+          ...newUsers.map(user => ({
+            email: user.email,
+            password: user.password || 'defaultPassword123',
+            name: user.name,
+            role: user.role
+          }))
+        ];
+      }
       
       const validUser = validCredentials.find(
         cred => cred.email === credentials.email && cred.password === credentials.password
@@ -50,6 +69,19 @@ class CustomSDK {
           can_manage_clients: true,
           can_access_archive: true,
           can_manage_settings: true
+        } : validUser.role === 'operator' ? {
+          can_create_events: true,
+          can_edit_events: true,
+          can_delete_events: false,
+          can_archive_events: false,
+          can_create_tasks: false,
+          can_edit_tasks: false,
+          can_delete_tasks: false,
+          can_manage_users: false,
+          can_view_reports: false,
+          can_manage_clients: false,
+          can_access_archive: false,
+          can_manage_settings: false
         } : {
           can_create_events: false,
           can_edit_events: false,

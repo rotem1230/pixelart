@@ -21,7 +21,7 @@ import { he } from "date-fns/locale";
 import { Progress } from "@/components/ui/progress"; // Added from outline
 
 
-export default function EventCard({ event, onEdit, onArchive, onSelect, tagColors, clientName, provided, snapshot, user, onMarkComplete }) {
+export default function EventCard({ event, onEdit, onArchive, onSelect, tagColors, clientName, provided, snapshot, user, onMarkComplete, operatorName }) {
   const completedChecklistItems = event.checklist ? event.checklist.filter(item => item.completed).length : 0;
   const totalChecklistItems = event.checklist ? event.checklist.length : 0;
   const checklistProgress = totalChecklistItems > 0 ? (completedChecklistItems / totalChecklistItems) * 100 : 0;
@@ -127,6 +127,27 @@ export default function EventCard({ event, onEdit, onArchive, onSelect, tagColor
           <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
             <MapPin className="w-3 h-3" />
             {event.location}
+          </div>
+        )}
+
+        {event.producer_name && (
+          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+            <Briefcase className="w-3 h-3" />
+            מפיק: {event.producer_name}
+          </div>
+        )}
+
+        {event.producer_phone && (
+          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+            <span className="w-3 h-3 text-center">📞</span>
+            {event.producer_phone}
+          </div>
+        )}
+
+        {operatorName && event.assigned_operator_id && (
+          <div className="flex items-center gap-2 text-sm text-orange-600 mb-2">
+            <span className="w-3 h-3 text-center">👤</span>
+            מפעיל: {operatorName}
           </div>
         )}
 

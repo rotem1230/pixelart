@@ -222,6 +222,10 @@ export default function Layout({ children, currentPageName }) {
                 ניווט ראשי
               </h3>
               {navigationItems.map((item) => {
+                // For operators, show only Events and Calendar
+                if (user?.role === 'operator' && !['אירועים', 'לוח שנה'].includes(item.title)) {
+                  return null;
+                }
                 if (item.title === "אזור אישי") {
                   return (
                     <div key={item.title} className="flex items-center gap-2">
