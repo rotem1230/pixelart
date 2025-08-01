@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Eye, EyeOff, Lock, Mail, Shield } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
 export default function Login() {
@@ -49,7 +49,7 @@ export default function Login() {
 
       // Attempt login
       const user = await base44.auth.login(formData);
-      
+
       if (user) {
         // Redirect to main app
         navigate('/');
@@ -64,7 +64,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4" dir="rtl">
       {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl"></div>
@@ -74,8 +74,12 @@ export default function Login() {
       <div className="relative w-full max-w-md">
         {/* Logo and title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl mb-4 shadow-lg">
-            <Shield className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center mb-4">
+            <img
+              src="/logo.jpg"
+              alt="Pixel Art Logo"
+              className="w-24 h-24 object-contain rounded-2xl shadow-lg"
+            />
           </div>
         </div>
 
@@ -85,7 +89,7 @@ export default function Login() {
               התחברות למערכת
             </CardTitle>
           </CardHeader>
-          
+
           <CardContent className="space-y-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Email field */}
@@ -94,7 +98,7 @@ export default function Login() {
                   כתובת אימייל
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
                     id="email"
                     name="email"
@@ -102,7 +106,7 @@ export default function Login() {
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder="your@email.com"
-                    className="pr-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                    className="pl-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                     disabled={isLoading}
                     dir="ltr"
                   />
@@ -115,7 +119,7 @@ export default function Login() {
                   סיסמה
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
                     id="password"
                     name="password"
@@ -123,13 +127,13 @@ export default function Login() {
                     value={formData.password}
                     onChange={handleInputChange}
                     placeholder="הזינו את הסיסמה שלכם"
-                    className="pr-10 pl-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                    className="pl-10 pr-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                     disabled={isLoading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors"
                     disabled={isLoading}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -164,6 +168,26 @@ export default function Login() {
             </form>
 
 
+          </CardContent>
+        </Card>
+
+        {/* Cross-device info */}
+        <Card className="mt-6 border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="text-center">
+              <h3 className="text-sm font-medium text-blue-800 mb-2">
+                🌐 סנכרון בין מחשבים
+              </h3>
+              <div className="text-xs text-blue-700 leading-relaxed space-y-1">
+                <p>
+                  <strong>עם שרת:</strong> הפעל את השרת (<code>cd server && npm start</code>)
+                  והנתונים יסונכרנו אוטומטית בין כל המחשבים
+                </p>
+                <p>
+                  <strong>ללא שרת:</strong> השתמש בגיבוי ידני דרך <strong>הגדרות → מסד נתונים</strong>
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

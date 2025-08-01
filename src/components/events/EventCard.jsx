@@ -14,14 +14,15 @@ import {
   Check,
   ShieldCheck, // Added from outline
   FileText,     // Added from outline
-  Banknote      // Added from outline
+  Banknote,     // Added from outline
+  Play
 } from "lucide-react";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
 import { Progress } from "@/components/ui/progress"; // Added from outline
 
 
-export default function EventCard({ event, onEdit, onArchive, onSelect, tagColors, clientName, provided, snapshot, user, onMarkComplete, operatorName }) {
+export default function EventCard({ event, onEdit, onArchive, onSelect, tagColors, clientName, provided, snapshot, user, onMarkComplete, operatorName, onStartTimer }) {
   const completedChecklistItems = event.checklist ? event.checklist.filter(item => item.completed).length : 0;
   const totalChecklistItems = event.checklist ? event.checklist.length : 0;
   const checklistProgress = totalChecklistItems > 0 ? (completedChecklistItems / totalChecklistItems) * 100 : 0;
@@ -51,10 +52,10 @@ export default function EventCard({ event, onEdit, onArchive, onSelect, tagColor
       {...provided.dragHandleProps}
       className={`mb-4 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 border-0 ${snapshot.isDragging ? 'bg-green-100' : 'bg-white'}`}
     >
-      <CardHeader className="bg-gray-50 pb-3" onClick={onSelect} style={{ cursor: 'pointer' }}>
+      <CardHeader className="bg-gray-50 pb-3 p-3 sm:p-6" onClick={onSelect} style={{ cursor: 'pointer' }}>
         <div className="flex justify-between items-start">
           <CardTitle
-            className={`text-lg font-bold leading-tight cursor-pointer hover:text-green-600 flex-1 ${
+            className={`text-base sm:text-lg font-bold leading-tight cursor-pointer hover:text-green-600 flex-1 ${
               event.is_completed ? 'line-through text-gray-500' : 'text-gray-900'
             }`}
             onClick={(e) => {
@@ -65,6 +66,21 @@ export default function EventCard({ event, onEdit, onArchive, onSelect, tagColor
             {event.name}
           </CardTitle>
           <div className="flex items-center gap-1">
+            {onStartTimer && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStartTimer(event);
+                }}
+                className="h-7 w-7 sm:h-8 sm:w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                title="התחל טיימר לאירוע"
+                disabled={user?.active_timer_id}
+              >
+                <Play className="w-3 h-3 sm:w-4 sm:h-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -72,10 +88,10 @@ export default function EventCard({ event, onEdit, onArchive, onSelect, tagColor
                 e.stopPropagation();
                 onMarkComplete(event);
               }}
-              className="h-8 w-8 text-gray-500 hover:text-green-600"
+              className="h-7 w-7 sm:h-8 sm:w-8 text-gray-500 hover:text-green-600"
               title="סמן כהושלם"
             >
-              <Check className="w-4 h-4" />
+              <Check className="w-3 h-3 sm:w-4 sm:h-4" />
             </Button>
             {canEdit && (
               <Button
@@ -85,10 +101,10 @@ export default function EventCard({ event, onEdit, onArchive, onSelect, tagColor
                   e.stopPropagation();
                   onEdit();
                 }}
-                className="h-8 w-8 text-gray-500 hover:text-blue-600"
+                className="h-7 w-7 sm:h-8 sm:w-8 text-gray-500 hover:text-blue-600"
                 title="ערוך אירוע"
               >
-                <Edit className="w-4 h-4" />
+                <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
               </Button>
             )}
             {canArchive && (
@@ -99,10 +115,10 @@ export default function EventCard({ event, onEdit, onArchive, onSelect, tagColor
                   e.stopPropagation();
                   onArchive();
                 }}
-                className="h-8 w-8 text-gray-500 hover:text-red-600"
+                className="h-7 w-7 sm:h-8 sm:w-8 text-gray-500 hover:text-red-600"
                 title="העבר לארכיון"
               >
-                <Archive className="w-4 h-4" />
+                <Archive className="w-3 h-3 sm:w-4 sm:h-4" />
               </Button>
             )}
           </div>
@@ -122,7 +138,7 @@ export default function EventCard({ event, onEdit, onArchive, onSelect, tagColor
         </div>
       </CardHeader>
 
-      <CardContent className="p-4 flex-grow flex flex-col" onClick={onSelect} style={{ cursor: 'pointer' }}>
+      <CardContent className="p-3 sm:p-4 flex-grow flex flex-col" onClick={onSelect} style={{ cursor: 'pointer' }}>
         {event.location && (
           <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
             <MapPin className="w-3 h-3" />

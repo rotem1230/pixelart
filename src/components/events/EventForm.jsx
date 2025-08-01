@@ -10,16 +10,18 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue } from
-"@/components/ui/select";
+  SelectValue
+} from
+  "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogTrigger } from
-"@/components/ui/dialog";
+  DialogTrigger
+} from
+  "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { X, Plus, Trash2, Image as ImageIcon, Clock } from "lucide-react";
 import { UploadFile } from "@/api/integrations";
@@ -29,10 +31,10 @@ import { User } from "@/api/entities";
 import { Client } from "@/api/entities"; // Added import for Client
 
 const statuses = [
-"משימות קרובים - לפי סדר קדימות",
-"לסיים היום/מחכה לך",
-"סיימתי - לבדיקה",
-"בוטל"];
+  "משימות קרובים - לפי סדר קדימות",
+  "לסיים היום/מחכה לך",
+  "סיימתי - לבדיקה",
+  "בוטל"];
 
 
 const approvalStatuses = ["ממתין לאישור", "מאושר", "נדחה"];
@@ -40,6 +42,21 @@ const bookingStatuses = ["טרם החל", "דילים בטיפול", "הושלם
 const paymentStatuses = ["טרם שולם", "שולם חלקי", "שולם במלואו", "סגור"];
 
 export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin }) {
+  // Initialize form data with backward compatibility for old single image format
+  const initializeImages = () => {
+    if (event?.screen_grid_images && Array.isArray(event.screen_grid_images)) {
+      return event.screen_grid_images;
+    } else if (event?.screen_grid_image_url) {
+      // Convert old single image format to new array format
+      return [{
+        id: Date.now(),
+        url: event.screen_grid_image_url,
+        filename: 'תמונה קיימת'
+      }];
+    }
+    return [];
+  };
+
   const [formData, setFormData] = useState({
     name: event?.name || "",
     date: event?.date || "",
@@ -51,7 +68,7 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
     location: event?.location || "",
     status: event?.status || statuses[0],
     checklist: event?.checklist || [],
-    screen_grid_image_url: event?.screen_grid_image_url || "",
+    screen_grid_images: initializeImages(),
     screen_grid_text: event?.screen_grid_text || "",
     timer_target_type: event?.timer_target_type || "event",
     timer_target_task_id: event?.timer_target_task_id || "",
@@ -74,6 +91,8 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
   const [availableOperators, setAvailableOperators] = useState([]);
   const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
   const [newClientName, setNewClientName] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [selectedImageForPreview, setSelectedImageForPreview] = useState(null);
 
   useEffect(() => {
     setAvailableClients(clients || []);
@@ -83,13 +102,13 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
     const fetchData = async () => {
       try {
         const [tagsData, tasksData, clientsData] = await Promise.all([
-        Tag.getAll(),
-        Task.getAll(),
-        Client.getAll()]
+          Tag.getAll(),
+          Task.getAll(),
+          Client.getAll()]
         );
         setAvailableTags(tagsData);
         setAvailableTasks(tasksData);
-        
+
         // Load operators from localStorage
         const systemUsers = localStorage.getItem('systemUsers');
         if (systemUsers) {
@@ -97,7 +116,7 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
           const operators = users.filter(user => user.role === 'operator');
           setAvailableOperators(operators);
         }
-        
+
         // This will be overridden by the prop if `clients` prop is provided
         if (!clients || clients.length === 0) {
           setAvailableClients(clientsData);
@@ -127,8 +146,8 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
     setFormData((prev) => ({
       ...prev,
       tags: prev.tags.includes(tagName) ?
-      prev.tags.filter((t) => t !== tagName) :
-      [...prev.tags, tagName]
+        prev.tags.filter((t) => t !== tagName) :
+        [...prev.tags, tagName]
     }));
   };
 
@@ -178,16 +197,77 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
   };
 
   const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
 
     setIsUploading(true);
     try {
-      const { file_url } = await UploadFile({ file });
-      handleInputChange("screen_grid_image_url", file_url);
+      const uploadPromises = files.map(file => UploadFile({ file }));
+      const results = await Promise.all(uploadPromises);
+
+      const newImages = results.map((result, index) => ({
+        id: Date.now() + index,
+        url: result.file_url || result.url,
+        filename: files[index].name
+      }));
+
+      setFormData(prev => ({
+        ...prev,
+        screen_grid_images: [...prev.screen_grid_images, ...newImages]
+      }));
+
+      // Clear the input
+      e.target.value = '';
     } catch (error) {
-      console.error("Error uploading image:", error);
-      alert("שגיאה בהעלאת התמונה.");
+      console.error("Error uploading images:", error);
+      alert("שגיאה בהעלאת התמונות: " + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeImage = (imageId) => {
+    setFormData(prev => ({
+      ...prev,
+      screen_grid_images: prev.screen_grid_images.filter(img => img.id !== imageId)
+    }));
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+    if (files.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      const uploadPromises = files.map(file => UploadFile({ file }));
+      const results = await Promise.all(uploadPromises);
+
+      const newImages = results.map((result, index) => ({
+        id: Date.now() + index,
+        url: result.file_url || result.url,
+        filename: files[index].name
+      }));
+
+      setFormData(prev => ({
+        ...prev,
+        screen_grid_images: [...prev.screen_grid_images, ...newImages]
+      }));
+    } catch (error) {
+      console.error("Error uploading images:", error);
+      alert("שגיאה בהעלאת התמונות: " + error.message);
     } finally {
       setIsUploading(false);
     }
@@ -248,7 +328,7 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
                 required />
 
             </div>
-            
+
             {/* Client */}
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700">לקוח</Label>
@@ -259,7 +339,7 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
                   </SelectTrigger>
                   <SelectContent>
                     {availableClients.map((client) =>
-                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
@@ -290,7 +370,7 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
                 </Dialog>
               </div>
             </div>
-            
+
             {/* Audience Arrival Time */}
             <div className="space-y-2">
               <Label htmlFor="audience_arrival_time" className="text-sm font-medium text-gray-700">
@@ -313,7 +393,7 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
                 </SelectTrigger>
                 <SelectContent>
                   {statuses.map((status) =>
-                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -403,7 +483,7 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
               </div>
 
               {formData.timer_target_type === "task" &&
-              <div className="space-y-2">
+                <div className="space-y-2">
                   <Label className="text-sm font-medium text-gray-700">משימה</Label>
                   <Select value={formData.timer_target_task_id} onValueChange={(value) => handleInputChange("timer_target_task_id", value)}>
                     <SelectTrigger>
@@ -411,8 +491,8 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
                     </SelectTrigger>
                     <SelectContent>
                       {availableTasks.map((task) =>
-                    <SelectItem key={task.id} value={task.id}>{task.description}</SelectItem>
-                    )}
+                        <SelectItem key={task.id} value={task.id}>{task.description}</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -426,34 +506,34 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
 
             {/* Selected Tags */}
             {formData.tags.length > 0 &&
-            <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2">
                 {formData.tags.map((tag) =>
-              <Badge
-                key={tag}
-                variant="secondary"
-                className="bg-blue-100 text-blue-800 border-blue-200 flex items-center gap-1">
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="bg-blue-100 text-blue-800 border-blue-200 flex items-center gap-1">
 
                     {tag}
                     <button
-                  type="button"
-                  onClick={() => removeTag(tag)}
-                  className="hover:bg-blue-200 rounded-full p-0.5">
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      className="hover:bg-blue-200 rounded-full p-0.5">
 
                       <X className="w-3 h-3" />
                     </button>
                   </Badge>
-              )}
+                )}
               </div>
             }
 
             {/* Available Tags */}
             <div className="flex flex-wrap gap-2">
               {availableTags.filter((tag) => !formData.tags.includes(tag.name)).map((tag) =>
-              <button
-                key={tag.id}
-                type="button"
-                onClick={() => handleTagToggle(tag.name)}
-                className="text-xs px-3 py-1 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1">
+                <button
+                  key={tag.id}
+                  type="button"
+                  onClick={() => handleTagToggle(tag.name)}
+                  className="text-xs px-3 py-1 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-1">
 
                   {tag.name}
                   <Plus className="w-3 h-3" />
@@ -481,7 +561,7 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
             <Label className="text-sm font-medium text-gray-700">צ'קליסט לאירוע</Label>
             <div className="space-y-2">
               {formData.checklist.map((item, index) =>
-              <div key={index} className="flex items-center gap-2">
+                <div key={index} className="flex items-center gap-2">
                   <Input value={item.item} disabled className="flex-grow bg-gray-100" />
                   <Button type="button" variant="ghost" size="icon" onClick={() => removeChecklistItem(index)}>
                     <Trash2 className="w-4 h-4 text-red-500" />
@@ -513,24 +593,109 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
                 onChange={(e) => handleInputChange("screen_grid_text", e.target.value)}
                 placeholder="טקסט להצגה על המסך..."
                 className="h-20" />
-
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="screen_grid_image">תמונה</Label>
-              <Input id="screen_grid_image" type="file" onChange={handleImageUpload} accept="image/*" />
-              {isUploading && <p className="text-sm text-blue-600">מעלה תמונה...</p>}
-              {formData.screen_grid_image_url && !isUploading &&
-              <div className="mt-2">
-                  <img src={formData.screen_grid_image_url} alt="תצוגה מקדימה" className="w-32 h-32 object-cover rounded-md" />
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="screen_grid_images">תמונות</Label>
+                <span className="text-sm text-gray-500">
+                  {formData.screen_grid_images.length} תמונות
+                </span>
+              </div>
+
+              <Input
+                id="screen_grid_images"
+                type="file"
+                onChange={handleImageUpload}
+                accept="image/*"
+                multiple
+                className="cursor-pointer"
+              />
+
+              {isUploading && (
+                <div className="flex items-center gap-2 text-sm text-blue-600">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  מעלה תמונות...
                 </div>
-              }
+              )}
+
+              {/* Images Grid */}
+              {formData.screen_grid_images.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                  {formData.screen_grid_images.map((image) => (
+                    <div key={image.id} className="relative group bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
+                      <img
+                        src={image.url}
+                        alt={image.filename}
+                        className="w-full h-auto object-contain max-h-64 cursor-pointer hover:opacity-90 transition-opacity"
+                        style={{ minHeight: '120px' }}
+                        onClick={() => setSelectedImageForPreview(image)}
+                        title="לחץ לצפייה בגודל מלא"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(image.id)}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600 shadow-lg z-10"
+                        title="הסר תמונה"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 pointer-events-none">
+                        <p className="text-white text-sm font-medium truncate">
+                          {image.filename}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Image Preview Modal */}
+              {selectedImageForPreview && (
+                <Dialog open={!!selectedImageForPreview} onOpenChange={() => setSelectedImageForPreview(null)}>
+                  <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+                    <DialogHeader className="p-4 pb-2">
+                      <DialogTitle className="text-right">
+                        {selectedImageForPreview.filename}
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="flex justify-center items-center p-4 pt-0">
+                      <img
+                        src={selectedImageForPreview.url}
+                        alt={selectedImageForPreview.filename}
+                        className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                      />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+
+              {formData.screen_grid_images.length === 0 && !isUploading && (
+                <div
+                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${isDragOver
+                    ? 'border-blue-400 bg-blue-50'
+                    : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <ImageIcon className={`w-8 h-8 mx-auto mb-2 ${isDragOver ? 'text-blue-500' : 'text-gray-400'}`} />
+                  <p className={`text-sm ${isDragOver ? 'text-blue-600' : 'text-gray-500'}`}>
+                    {isDragOver ? 'שחרר כדי להעלות' : 'לא נבחרו תמונות'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    ניתן לבחור מספר תמונות בו זמנית או לגרור ולשחרר כאן
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
           {isAdmin &&
-          <div className="space-y-6 border-t-2 border-dashed border-gray-200 pt-6 mt-6">
+            <div className="space-y-6 border-t-2 border-dashed border-gray-200 pt-6 mt-6">
               <h3 className="text-lg font-semibold text-gray-800">ניהול האירוע (מנהלים)</h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
                 {/* Assigned Operator */}
                 <div className="space-y-2">
@@ -582,20 +747,20 @@ export default function EventForm({ event, onSubmit, onCancel, clients, isAdmin 
                 <Label className="text-sm font-medium text-gray-700">צ'קליסט מנהל</Label>
                 <div className="space-y-2">
                   {formData.manager_checklist.map((item, index) =>
-                <div key={index} className="flex items-center gap-2">
+                    <div key={index} className="flex items-center gap-2">
                       <Input value={item.item} disabled className="flex-grow bg-gray-100" />
                       <Button type="button" variant="ghost" size="icon" onClick={() => removeManagerChecklistItem(index)}>
                         <Trash2 className="w-4 h-4 text-red-500" />
                       </Button>
                     </div>
-                )}
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Input
-                  value={newManagerChecklistItem}
-                  onChange={(e) => setNewManagerChecklistItem(e.target.value)}
-                  onKeyDown={handleManagerChecklistKeyDown}
-                  placeholder="הוסף פריט לצ'קליסט המנהל..." />
+                    value={newManagerChecklistItem}
+                    onChange={(e) => setNewManagerChecklistItem(e.target.value)}
+                    onKeyDown={handleManagerChecklistKeyDown}
+                    placeholder="הוסף פריט לצ'קליסט המנהל..." />
 
                   <Button type="button" onClick={addManagerChecklistItem}><Plus className="w-4 h-4" /></Button>
                 </div>

@@ -94,13 +94,13 @@ export default function Clients() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6" dir="rtl">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6" dir="rtl">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">ניהול לקוחות</h1>
-          <p className="text-gray-600">נהל את רשימת הלקוחות שלך וצפה בפעילותם.</p>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">ניהול לקוחות</h1>
+          <p className="text-sm sm:text-base text-gray-600">נהל את רשימת הלקוחות שלך וצפה בפעילותם.</p>
         </div>
-        <Button onClick={() => { setEditingClient(null); setShowForm(true); }} className="gap-2 bg-green-600 hover:bg-green-700">
+        <Button onClick={() => { setEditingClient(null); setShowForm(true); }} className="gap-2 bg-green-600 hover:bg-green-700 w-full sm:w-auto">
           <Plus className="w-4 h-4" />
           לקוח חדש
         </Button>
@@ -121,8 +121,42 @@ export default function Clients() {
             רשימת לקוחות ({clients.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
+        <CardContent className="p-3 sm:p-6">
+          {/* Mobile Card Layout */}
+          <div className="block sm:hidden space-y-3">
+            {clients.map(client => (
+              <Card key={client.id} className="border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900 mb-1">{client.name}</h3>
+                      {client.contact_person && (
+                        <p className="text-sm text-gray-600 mb-1">איש קשר: {client.contact_person}</p>
+                      )}
+                      {client.email && (
+                        <p className="text-sm text-gray-600 mb-2">{client.email}</p>
+                      )}
+                      <div className="flex items-center gap-1 text-sm text-gray-500">
+                        <Calendar className="w-4 h-4" />
+                        {eventCountByClient[client.id] || 0} אירועים
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(client)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(client.id)} className="text-red-600 hover:text-red-700">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop Table Layout */}
+          <div className="hidden sm:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

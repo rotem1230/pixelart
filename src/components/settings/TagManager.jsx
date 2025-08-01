@@ -33,7 +33,7 @@ export default function TagManager() {
   const fetchTags = async () => {
     setIsLoading(true);
     try {
-      const tagsData = await Tag.list();
+      const tagsData = await Tag.getAll();
       setTags(tagsData);
     } catch (error) {
       console.error("Error fetching tags:", error);
@@ -95,50 +95,64 @@ export default function TagManager() {
   };
 
   if (isLoading) {
-    return <div>טוען תיוגים...</div>;
+    return <div className="p-4 text-center">טוען תיוגים...</div>;
   }
 
   return (
-    <div className="grid md:grid-cols-2 gap-8">
+    <div className="grid md:grid-cols-2 gap-8" dir="rtl">
       <Card>
         <CardHeader>
-          <CardTitle>הוספת תיוג חדש</CardTitle>
+          <CardTitle className="text-right">הוספת תיוג חדש</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="new-tag-name">שם התיוג</Label>
+          <div className="space-y-2">
+            <Label htmlFor="new-tag-name" className="text-right block">שם התיוג</Label>
             <Input
               id="new-tag-name"
               value={newTagName}
               onChange={(e) => setNewTagName(e.target.value)}
               placeholder="למשל: חשוב"
+              className="text-right"
             />
           </div>
-          <div>
-            <Label>צבע רקע</Label>
-            <div className="flex items-center gap-4">
+          <div className="space-y-2">
+            <Label className="text-right block">צבע רקע</Label>
+            <div className="flex items-center gap-4 justify-end">
+              <Input
+                value={newTagColor}
+                onChange={(e) => setNewTagColor(e.target.value)}
+                className="w-32 text-left"
+                dir="ltr"
+              />
               <Input
                 type="color"
                 value={newTagColor}
                 onChange={(e) => setNewTagColor(e.target.value)}
                 className="p-1 h-10 w-16 cursor-pointer"
               />
-              <Input
-                value={newTagColor}
-                onChange={(e) => setNewTagColor(e.target.value)}
-                className="w-32"
-              />
+            </div>
+            <div className="flex gap-2 justify-end flex-wrap mt-2">
+              {['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280'].map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setNewTagColor(color)}
+                  className="w-6 h-6 rounded border-2 border-gray-300 hover:border-gray-500 transition-colors"
+                  style={{ backgroundColor: color }}
+                  title={color}
+                />
+              ))}
             </div>
           </div>
           <Button onClick={handleAddTag} className="w-full">
-            <Plus className="w-4 h-4 ml-2" />
+            <Plus className="w-4 h-4 mr-2" />
             הוסף תיוג
           </Button>
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>תיוגים קיימים ({tags.length})</CardTitle>
+          <CardTitle className="text-right">תיוגים קיימים ({tags.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -150,43 +164,57 @@ export default function TagManager() {
                     <Input
                       value={editingTag.name}
                       onChange={(e) => onEditFormChange('name', e.target.value)}
+                      className="text-right"
                     />
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 justify-end">
+                      <Input
+                        value={editingTag.color}
+                        onChange={(e) => onEditFormChange('color', e.target.value)}
+                        className="w-32 text-left"
+                        dir="ltr"
+                      />
                       <Input
                         type="color"
                         value={editingTag.color}
                         onChange={(e) => onEditFormChange('color', e.target.value)}
                         className="p-1 h-10 w-16 cursor-pointer"
                       />
-                      <Input
-                        value={editingTag.color}
-                        onChange={(e) => onEditFormChange('color', e.target.value)}
-                        className="w-32"
-                      />
                     </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleUpdateTag(editingTag)}>
-                        <Save className="w-4 h-4 ml-1" /> שמור
-                      </Button>
+                    <div className="flex gap-2 justify-end flex-wrap">
+                      {['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280'].map(color => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => onEditFormChange('color', color)}
+                          className="w-6 h-6 rounded border-2 border-gray-300 hover:border-gray-500 transition-colors"
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex gap-2 justify-end">
                       <Button size="sm" variant="ghost" onClick={cancelEditing}>
-                        <X className="w-4 h-4 ml-1" /> ביטול
+                        <X className="w-4 h-4 mr-1" /> ביטול
+                      </Button>
+                      <Button size="sm" onClick={() => handleUpdateTag(editingTag)}>
+                        <Save className="w-4 h-4 mr-1" /> שמור
                       </Button>
                     </div>
                   </div>
                 ) : (
                   // Display View
                   <div className="flex items-center justify-between p-2 border rounded-lg">
-                    <Badge style={{ backgroundColor: tag.color, color: tag.text_color }}>
-                      {tag.name}
-                    </Badge>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => startEditing(tag)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDeleteTag(tag.id)}>
                         <Trash2 className="w-4 h-4 text-red-500" />
                       </Button>
+                      <Button variant="ghost" size="icon" onClick={() => startEditing(tag)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
                     </div>
+                    <Badge style={{ backgroundColor: tag.color, color: tag.text_color }}>
+                      {tag.name}
+                    </Badge>
                   </div>
                 )}
               </div>

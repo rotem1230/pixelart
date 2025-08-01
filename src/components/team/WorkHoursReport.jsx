@@ -55,8 +55,8 @@ export default function WorkHoursReport() {
     try {
       const [hoursData, usersData, eventsData] = await Promise.all([
         WorkHours.list("-date"),
-        User.list(),
-        Event.list()
+        User.getAll(),
+        Event.getAll()
       ]);
       setWorkHours(hoursData);
       setUsers(usersData);

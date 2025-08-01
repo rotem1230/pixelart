@@ -23,7 +23,8 @@ import {
   Trash2,
   AlertTriangle,
   CheckSquare,
-  GripVertical
+  GripVertical,
+  Play
 } from "lucide-react";
 import { format, isBefore } from "date-fns";
 import { he } from "date-fns/locale";
@@ -55,7 +56,7 @@ const tagStyleMap = {
   "הושלם": { backgroundColor: '#dcfce7', color: '#166534', borderColor: '#bbf7d0' },
 };
 
-export default function TasksList({ tasks, events, users, onEditTask, onTaskStatusChange, onDeleteTask, onSelectTask, onReorderTasks, onPriorityChange, isLoading, isCompletedList = false, canEdit, canDelete }) {
+export default function TasksList({ tasks, events, users, user, onEditTask, onTaskStatusChange, onDeleteTask, onSelectTask, onReorderTasks, onPriorityChange, onStartTimer, isLoading, isCompletedList = false, canEdit, canDelete }) {
   const [isDragging, setIsDragging] = useState(false);
 
   const getEventName = (eventId) => {
@@ -248,6 +249,18 @@ export default function TasksList({ tasks, events, users, onEditTask, onTaskStat
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
+                                {!isCompletedList && onStartTimer && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {e.stopPropagation(); onStartTimer(task)}}
+                                    className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                    title="התחל טיימר למשימה"
+                                    disabled={user?.active_timer_id}
+                                  >
+                                    <Play className="w-3 h-3" />
+                                  </Button>
+                                )}
                                 {canEdit && (
                                   <Button
                                     variant="ghost"

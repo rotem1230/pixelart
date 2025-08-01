@@ -57,8 +57,63 @@ export default function WorkHoursTable({ workHours, events, onEdit, onDelete, is
           רישומי שעות עבודה ({workHours.length})
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
+      <CardContent className="p-3 sm:p-6">
+        {/* Mobile Card Layout */}
+        <div className="block sm:hidden space-y-3">
+          {workHours.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p>אין רישומי שעות עדיין</p>
+            </div>
+          ) : (
+            workHours.map(entry => (
+              <Card key={entry.id} className="border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-medium text-gray-900">
+                          {format(new Date(entry.date), "d בMMMM yyyy", { locale: he })}
+                        </h3>
+                        <Badge className={`${statusColors[entry.status]} text-xs`} variant="secondary">
+                          {entry.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2 truncate">
+                        אירוע: {getEventName(entry.event_id)}
+                      </p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span className="font-mono text-sm">
+                          {entry.start_time} - {entry.end_time}
+                        </span>
+                        <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                          {entry.hours_worked?.toFixed(1)} שעות
+                        </Badge>
+                      </div>
+                      {entry.notes && entry.notes !== "אין הערות" && (
+                        <p className="text-sm text-gray-500 truncate">
+                          הערות: {entry.notes}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => onEdit(entry)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => onDelete(entry.id)} className="text-red-500 hover:text-red-700">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table Layout */}
+        <div className="hidden sm:block overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -89,31 +144,31 @@ export default function WorkHoursTable({ workHours, events, onEdit, onDelete, is
                         {entry.start_time} - {entry.end_time}
                       </div>
                     </TableCell>
-                    
+
                     <TableCell>
                       <div className="font-medium text-gray-900">
                         {getEventName(entry.event_id)}
                       </div>
                     </TableCell>
-                    
+
                     <TableCell>
                       <Badge variant="secondary" className="bg-green-100 text-green-800">
                         {entry.hours_worked?.toFixed(1)} שעות
                       </Badge>
                     </TableCell>
-                    
+
                     <TableCell>
                       <Badge className={statusColors[entry.status]} variant="secondary">
                         {entry.status}
                       </Badge>
                     </TableCell>
-                    
+
                     <TableCell>
                       <div className="max-w-xs text-sm text-gray-600">
                         {entry.notes || "אין הערות"}
                       </div>
                     </TableCell>
-                    
+
                     <TableCell>
                       <div className="flex gap-2">
                         <Button

@@ -40,11 +40,37 @@ export default function TeamManagement() {
     setIsLoading(true);
     try {
       const [usersData, currentUserData] = await Promise.all([
-        Promise.resolve([]), // Mock users list for now
+        User.getAll(),
         User.getCurrentUser()
       ]);
       
-      setUsers(usersData);
+      console.log("Current user data:", currentUserData);
+      console.log("Users data:", usersData);
+      
+      // If no users exist, initialize with current user
+      if (usersData.length === 0 && currentUserData) {
+        const initialUser = {
+          id: currentUserData.id || Date.now().toString(),
+          name: currentUserData.name || currentUserData.full_name,
+          full_name: currentUserData.full_name || currentUserData.name,
+          email: currentUserData.email,
+          role: currentUserData.role || 'admin',
+          phone: '',
+          position: currentUserData.role === 'admin' ? 'מנהל מערכת' : 'עובד',
+          hire_date: new Date().toISOString().split('T')[0],
+          is_approved: true,
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+          last_login: new Date().toISOString(),
+          permissions: currentUserData.permissions || {}
+        };
+        
+        localStorage.setItem('systemUsers', JSON.stringify([initialUser]));
+        setUsers([initialUser]);
+      } else {
+        setUsers(usersData);
+      }
+      
       setCurrentUser(currentUserData);
     } catch (error) {
       console.error("Error loading data:", error);
@@ -82,6 +108,8 @@ export default function TeamManagement() {
         delete updated[userId];
         return updated;
       });
+      
+      alert("הרשאות עודכנו בהצלחה!");
       
     } catch (error) {
       console.error("Error updating permissions:", error);
@@ -121,7 +149,7 @@ export default function TeamManagement() {
 
   if (isLoading) {
     return (
-      <div className="p-6 lg:p-8">
+      <div className="p-6 lg:p-8" dir="rtl">
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-gray-200 rounded w-48"></div>
           <div className="grid gap-6">
@@ -134,12 +162,36 @@ export default function TeamManagement() {
     );
   }
 
-  if (currentUser?.role !== 'admin') {
+  // If no current user data, show error
+  if (!currentUser) {
     return (
-      <div className="p-8 text-center">
+      <div className="p-8 text-center" dir="rtl">
+        <Shield className="w-16 h-16 mx-auto text-red-500 mb-4" />
+        <h1 className="text-2xl font-bold">שגיאה בטעינת נתוני המשתמש</h1>
+        <p className="text-gray-600">לא ניתן לטעון את פרטי המשתמש הנוכחי.</p>
+        <Button 
+          onClick={() => window.location.reload()} 
+          className="mt-4"
+        >
+          רענן דף
+        </Button>
+      </div>
+    );
+  }
+
+  // Check if user has admin permissions
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.is_admin === true;
+  
+  if (!isAdmin && currentUser) {
+    return (
+      <div className="p-8 text-center" dir="rtl">
         <Shield className="w-16 h-16 mx-auto text-red-500 mb-4" />
         <h1 className="text-2xl font-bold">אין לך הרשאת גישה</h1>
         <p className="text-gray-600">עמוד זה זמין למנהלי מערכת בלבד.</p>
+        <div className="mt-4 p-4 bg-gray-100 rounded-lg text-sm text-gray-700">
+          <p>משתמש נוכחי: {currentUser.full_name || currentUser.name || currentUser.email}</p>
+          <p>תפקיד: {currentUser.role || 'לא מוגדר'}</p>
+        </div>
       </div>
     );
   }
@@ -163,14 +215,14 @@ export default function TeamManagement() {
       </div>
 
       <Tabs defaultValue="permissions" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="permissions" className="flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            ניהול הרשאות
-          </TabsTrigger>
+        <TabsList className="grid w-full max-w-md grid-cols-2 mr-auto">
           <TabsTrigger value="work_hours" className="flex items-center gap-2">
             <Clock className="w-4 h-4" />
             דוחות שעות
+          </TabsTrigger>
+          <TabsTrigger value="permissions" className="flex items-center gap-2">
+            <Shield className="w-4 h-4" />
+            ניהול הרשאות
           </TabsTrigger>
         </TabsList>
         

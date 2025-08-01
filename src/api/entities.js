@@ -23,5 +23,8 @@ export const Comment = base44.entities.Comment;
 
 
 
-// auth sdk:
-export const User = base44.auth;
+// User entity with both auth and CRUD operations
+export const User = {
+  ...base44.auth,
+  ...base44.entities.User
+};

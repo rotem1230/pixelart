@@ -5,7 +5,7 @@ import { Event } from "@/api/entities";
 import { User } from "@/api/entities";
 import { WorkHours } from "@/api/entities";
 import { Button } from "@/components/ui/button";
-import { Plus, CheckCircle2 } from "lucide-react";
+import { Plus, CheckCircle2, Play } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GripVertical } from 'lucide-react';
 import { Clock, Square as StopIcon } from 'lucide-react';
@@ -15,6 +15,7 @@ import TaskForm from "../components/tasks/TaskForm";
 import TasksList from "../components/tasks/TasksList";
 import TaskFilters from "../components/tasks/TaskFilters";
 import TaskDetailsModal from "../components/tasks/TaskDetailsModal";
+import AdminTimerOverview from "../components/admin/AdminTimerOverview";
 
 // Timer Display Component for Tasks page
 function TimerDisplay({ user, onStopTimer }) {
@@ -66,7 +67,7 @@ function TimerDisplay({ user, onStopTimer }) {
 
   return (
     <Card className="bg-white/90 backdrop-blur-sm shadow-md border border-gray-200">
-      <div className="p-3 flex items-center gap-3">
+      <div className="p-2 sm:p-3 flex items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-2">
           {isTimerActive ? (
             <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
@@ -75,21 +76,21 @@ function TimerDisplay({ user, onStopTimer }) {
           )}
           <Clock className="w-4 h-4 text-gray-600" />
         </div>
-        
-        <div className="flex flex-col min-w-[120px]">
-          <div className="font-mono text-sm font-bold text-gray-900">
+
+        <div className="flex flex-col min-w-[100px] sm:min-w-[120px]">
+          <div className="font-mono text-xs sm:text-sm font-bold text-gray-900">
             {isTimerActive ? getElapsedTime() : "00:00:00"}
           </div>
           <div className="text-xs text-gray-600 truncate">
             {isTimerActive ? user.active_timer_event_name : "לא פעיל"}
           </div>
         </div>
-        
+
         {isTimerActive && (
           <Button
             onClick={onStopTimer}
             size="sm"
-            className="bg-red-600 hover:bg-red-700 h-7 px-2 text-xs"
+            className="bg-red-600 hover:bg-red-700 h-6 sm:h-7 px-1 sm:px-2 text-xs"
           >
             <StopIcon className="w-3 h-3" />
           </Button>
@@ -104,6 +105,7 @@ export default function Tasks() {
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
   const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -117,6 +119,35 @@ export default function Tasks() {
 
   useEffect(() => {
     loadData();
+
+    // Listen for cloud sync updates
+    const handleCloudSyncUpdate = (e) => {
+      const { entityName } = e.detail;
+      if (entityName === 'tasks' || entityName === 'events' || entityName === 'systemUsers') {
+        console.log(`Cloud sync update received for ${entityName}, refreshing tasks...`);
+        loadData();
+      }
+    };
+
+    const handleCloudSyncComplete = () => {
+      console.log('Full cloud sync completed, refreshing tasks...');
+      loadData();
+    };
+
+    const handleForceUIRefresh = () => {
+      console.log('Force UI refresh triggered, reloading tasks...');
+      loadData();
+    };
+
+    window.addEventListener('cloudSyncUpdate', handleCloudSyncUpdate);
+    window.addEventListener('cloudSyncComplete', handleCloudSyncComplete);
+    window.addEventListener('forceUIRefresh', handleForceUIRefresh);
+
+    return () => {
+      window.removeEventListener('cloudSyncUpdate', handleCloudSyncUpdate);
+      window.removeEventListener('cloudSyncComplete', handleCloudSyncComplete);
+      window.removeEventListener('forceUIRefresh', handleForceUIRefresh);
+    };
   }, []);
 
   const loadData = async () => {
@@ -140,6 +171,7 @@ export default function Tasks() {
       setEvents(eventsData);
       setUsers(usersData);
       setUser(userData);
+      setIsAdmin(userData?.role === 'admin');
     } catch (error) {
       console.error("Error loading data:", error);
     }
@@ -278,6 +310,95 @@ export default function Tasks() {
     }
   };
 
+  const handleStartTaskTimer = async (task) => {
+    console.log("Starting timer for task:", task.description, "User:", user);
+    
+    if (!user) {
+      alert("שגיאה: לא ניתן לאתר פרטי משתמש.");
+      return;
+    }
+    // Allow multiple timers - removed restriction
+    
+    try {
+      console.log("Creating work hour entry for task...");
+      
+      const newWorkHour = await WorkHours.create({
+        task_id: task.id,
+        event_id: task.event_id, // Link to event if task is associated with one
+        user_id: user.id || user.email,
+        date: format(new Date(), 'yyyy-MM-dd'),
+        start_time: format(new Date(), 'HH:mm:ss'),
+        status: "בתהליך"
+      });
+      
+      console.log("Work hour created for task:", newWorkHour);
+      
+      const timerStartTime = new Date();
+      const updatedUser = { 
+        ...user, 
+        active_timer_id: newWorkHour.id,
+        active_timer_event_id: task.event_id,
+        active_timer_event_name: `משימה: ${task.description}`,
+        active_timer_start_time: timerStartTime.toISOString()
+      };
+      
+      // Update current user in localStorage
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      
+      // Update systemUsers for admin visibility
+      try {
+        const systemUsers = JSON.parse(localStorage.getItem('systemUsers') || '[]');
+        const updatedSystemUsers = systemUsers.map(u => {
+          if (u.id === user.id || u.email === user.email) {
+            return { ...u, ...updatedUser };
+          }
+          return u;
+        });
+        
+        // If user not found in systemUsers, add them
+        const userExists = systemUsers.some(u => u.id === user.id || u.email === user.email);
+        if (!userExists) {
+          updatedSystemUsers.push(updatedUser);
+        }
+        
+        localStorage.setItem('systemUsers', JSON.stringify(updatedSystemUsers));
+        console.log('Updated systemUsers with task timer info:', updatedSystemUsers);
+        
+        // Trigger storage event for other components to update
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'systemUsers',
+          newValue: JSON.stringify(updatedSystemUsers)
+        }));
+        
+      } catch (error) {
+        console.warn('Could not update systemUsers:', error);
+      }
+      
+      // Also try to update via API if available
+      try {
+        await User.update(user.id, updatedUser);
+        console.log('User updated via API');
+      } catch (apiError) {
+        console.warn('Could not update user via API:', apiError);
+      }
+      
+      console.log("Task timer started successfully");
+      alert(`טיימר הופעל בהצלחה עבור משימה: ${task.description}`);
+      
+    } catch (error) {
+      console.error("Error starting task timer:", error);
+      
+      if (error.message?.includes('WorkHours')) {
+        alert("שגיאה ביצירת רישום שעות עבודה. אנא נסה שוב.");
+      } else if (error.message?.includes('create')) {
+        alert("שגיאה בשמירת הנתונים. אנא בדוק את החיבור למערכת.");
+      } else {
+        alert(`שגיאה בהפעלת הטיימר: ${error.message || 'שגיאה לא ידועה'}`);
+      }
+    }
+  };
+
   const handleStopTimer = async () => {
     if (!user || !user.active_timer_id) return;
     try {
@@ -302,10 +423,46 @@ export default function Tasks() {
             ...user, 
             active_timer_id: null, 
             active_timer_event_id: null,
-            active_timer_event_name: null
+            active_timer_event_name: null,
+            active_timer_start_time: null
         };
+        
+        // Update current user in localStorage
         localStorage.setItem('currentUser', JSON.stringify(updatedUser));
         setUser(updatedUser);
+
+        // Update systemUsers to reflect timer stop
+        try {
+          const systemUsers = JSON.parse(localStorage.getItem('systemUsers') || '[]');
+          const updatedSystemUsers = systemUsers.map(u => {
+            if (u.id === user.id || u.email === user.email) {
+              return { ...u, ...updatedUser };
+            }
+            return u;
+          });
+          localStorage.setItem('systemUsers', JSON.stringify(updatedSystemUsers));
+          console.log('Updated systemUsers after stopping task timer:', updatedSystemUsers);
+          
+          // Trigger storage event for other components to update
+          window.dispatchEvent(new StorageEvent('storage', {
+            key: 'systemUsers',
+            newValue: JSON.stringify(updatedSystemUsers)
+          }));
+          
+        } catch (error) {
+          console.warn('Could not update systemUsers:', error);
+        }
+
+        // Also try to update via API if available
+        try {
+          await User.update(user.id, updatedUser);
+          console.log('User updated via API after stopping task timer');
+        } catch (apiError) {
+          console.warn('Could not update user via API:', apiError);
+        }
+
+        const taskName = user.active_timer_event_name || 'המשימה';
+        alert(`הטיימר נעצר בהצלחה. זמן עבודה: ${Math.floor(hoursWorked)}:${String(Math.floor((hoursWorked % 1) * 60)).padStart(2, '0')} שעות על ${taskName}`);
 
     } catch (error) {
         console.error("Error stopping timer:", error);
@@ -323,6 +480,7 @@ export default function Tasks() {
         try {
             const userData = await User.getCurrentUser();
             setUser(userData);
+            setIsAdmin(userData?.role === 'admin');
         } catch (reloadError) {
             console.error("Failed to reload user data:", reloadError);
         }
@@ -342,24 +500,30 @@ export default function Tasks() {
   });
 
   return (
-    <div className="p-6 lg:p-8 space-y-6" dir="rtl">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6" dir="rtl">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div className="flex flex-col gap-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col gap-2 w-full sm:w-auto">
           <TimerDisplay user={user} onStopTimer={handleStopTimer} />
-          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
             ניהול משימות
           </h1>
         </div>
         
         <div className="flex items-center gap-4">
-              <Button
-                onClick={() => setShowForm(true)}
-                className="gap-2 bg-green-600 hover:bg-green-700"
-              >
-                <Plus className="w-4 h-4" />
-                משימה חדשה
-              </Button>
+          {isAdmin && (
+            <AdminTimerOverview 
+              key={`admin-timer-tasks-${Date.now()}`} 
+              currentUser={user}
+            />
+          )}
+          <Button
+            onClick={() => setShowForm(true)}
+            className="gap-2 bg-green-600 hover:bg-green-700"
+          >
+            <Plus className="w-4 h-4" />
+            משימה חדשה
+          </Button>
         </div>
       </div>
 
@@ -390,12 +554,14 @@ export default function Tasks() {
         tasks={filteredActiveTasks}
         events={events}
         users={users}
+        user={user}
         onEditTask={handleEditTask}
         onTaskStatusChange={handleTaskStatusChange}
         onDeleteTask={handleDeleteTask}
         onSelectTask={handleSelectTask}
         onReorderTasks={handleReorderTasks}
         onPriorityChange={handleTaskPriorityChange}
+        onStartTimer={handleStartTaskTimer}
         isLoading={isLoading}
         canEdit={user?.role === 'admin' || user?.permissions?.can_edit_tasks}
         canDelete={user?.role === 'admin' || user?.permissions?.can_delete_tasks}
@@ -415,12 +581,14 @@ export default function Tasks() {
               tasks={completedTasks}
               events={events}
               users={users}
+              user={user}
               onEditTask={handleEditTask}
               onTaskStatusChange={handleTaskStatusChange}
               onDeleteTask={handlePermanentDeleteTask} // Permanent delete for completed
               onSelectTask={handleSelectTask}
               onReorderTasks={() => {}} // No reordering for completed
               onPriorityChange={handleTaskPriorityChange}
+              onStartTimer={null} // No timer for completed tasks
               isLoading={isLoading}
               isCompletedList={true}
               canEdit={user?.role === 'admin' || user?.permissions?.can_edit_tasks}

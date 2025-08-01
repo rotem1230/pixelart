@@ -5,7 +5,7 @@ import { PersonalMessage } from '@/api/entities';
 import { createPageUrl } from '@/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Send, AtSign, MessageSquare, Trash2 } from 'lucide-react';
+import { Send, AtSign, MessageSquare, Trash2, CheckCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
 
@@ -17,11 +17,13 @@ export default function Comments({ itemId, itemType, itemName }) {
   const [showMentions, setShowMentions] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     const loadUsersAndMe = async () => {
       try {
-        const [usersData, currentUserData] = await Promise.all([User.list(), User.me()]);
+        const [usersData, currentUserData] = await Promise.all([User.getAll(), User.getCurrentUser()]);
         setUsers(usersData);
         setCurrentUser(currentUserData);
       } catch (error) {
@@ -37,7 +39,10 @@ export default function Comments({ itemId, itemType, itemName }) {
     let isMounted = true;
     const fetchComments = async () => {
       try {
-        const commentsData = await Comment.filter({ item_id: itemId }, '-created_date');
+        const allComments = await Comment.getAll();
+        const commentsData = allComments
+          .filter(comment => comment.item_id === itemId)
+          .sort((a, b) => new Date(b.created_date || b.created_at) - new Date(a.created_date || a.created_at));
         if (isMounted) {
           setComments(commentsData);
         }
@@ -48,14 +53,24 @@ export default function Comments({ itemId, itemType, itemName }) {
 
     setIsLoading(true);
     fetchComments().finally(() => {
-        if(isMounted) setIsLoading(false);
+      if (isMounted) setIsLoading(false);
     });
 
-    const interval = setInterval(fetchComments, 5000); 
+    const interval = setInterval(fetchComments, 5000);
+
+    // Listen for localStorage changes to update comments in real-time
+    const handleStorageChange = (e) => {
+      if (e.key === 'comments') {
+        fetchComments();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, [itemId]);
 
@@ -65,13 +80,13 @@ export default function Comments({ itemId, itemType, itemName }) {
 
     const atIndex = text.lastIndexOf('@');
     if (atIndex !== -1) {
-        const query = text.substring(atIndex + 1).split(' ')[0];
-        if (query.match(/^[a-zA-Z0-9_א-ת]*$/)) {
-            setMentionQuery(query.toLowerCase());
-            setShowMentions(true);
-        } else {
-            setShowMentions(false);
-        }
+      const query = text.substring(atIndex + 1).split(' ')[0];
+      if (query.match(/^[a-zA-Z0-9_א-ת]*$/)) {
+        setMentionQuery(query.toLowerCase());
+        setShowMentions(true);
+      } else {
+        setShowMentions(false);
+      }
     } else {
       setShowMentions(false);
     }
@@ -80,7 +95,8 @@ export default function Comments({ itemId, itemType, itemName }) {
   const handleMentionSelect = (user) => {
     const atIndex = newComment.lastIndexOf('@');
     const textBefore = newComment.substring(0, atIndex);
-    const newText = `${textBefore}@${user.full_name} `;
+    const userName = user.full_name || user.name || user.email;
+    const newText = `${textBefore}@${userName} `;
     setNewComment(newText);
     setShowMentions(false);
   };
@@ -89,9 +105,10 @@ export default function Comments({ itemId, itemType, itemName }) {
     e.preventDefault();
     if (!newComment.trim() || !currentUser) return;
 
-    const mentionedUsers = users.filter(user => 
-        user.full_name && newComment.includes(`@${user.full_name}`)
-    );
+    const mentionedUsers = users.filter(user => {
+      const userName = user.full_name || user.name || user.email;
+      return userName && newComment.includes(`@${userName}`);
+    });
     const mentionIds = mentionedUsers.map(u => u.id);
 
     try {
@@ -102,11 +119,20 @@ export default function Comments({ itemId, itemType, itemName }) {
         item_type: itemType,
         content: newComment,
         mentions: mentionIds,
-        author_name: senderDisplayName
+        author_name: senderDisplayName,
+        created_by: currentUser.email,
+        created_date: new Date().toISOString()
       });
 
       setComments(prev => [createdComment, ...prev]);
       setNewComment('');
+
+      // Show success message for all comments
+      if (mentionedUsers.length === 0) {
+        setSuccessMessage('התגובה נשלחה בהצלחה!');
+        setShowSuccessMessage(true);
+        setTimeout(() => setShowSuccessMessage(false), 2000);
+      }
 
       if (mentionedUsers.length > 0) {
         const notificationPromises = mentionedUsers
@@ -123,11 +149,26 @@ export default function Comments({ itemId, itemType, itemName }) {
           });
 
         await Promise.all(notificationPromises);
+
+        // Show success message for mentions (longer duration)
+        if (mentionedUsers.length > 0) {
+          setSuccessMessage(`התיוג נשלח ל-${mentionedUsers.length} משתמשים!`);
+          setShowSuccessMessage(true);
+          setTimeout(() => setShowSuccessMessage(false), 3000);
+        }
       }
 
     } catch (error) {
       console.error("Error submitting comment or sending notifications:", error);
-      alert("שגיאה בשליחת התגובה או ההתראות.");
+
+      // More specific error handling
+      if (error.message?.includes('Comment')) {
+        alert("שגיאה בשליחת התגובה. אנא נסה שוב.");
+      } else if (error.message?.includes('PersonalMessage')) {
+        alert("התגובה נשלחה אך ההתראות לא נשלחו.");
+      } else {
+        alert("שגיאה בשליחת התגובה. אנא נסה שוב.");
+      }
     }
   };
 
@@ -147,22 +188,28 @@ export default function Comments({ itemId, itemType, itemName }) {
 
   const canDeleteComment = (comment) => {
     if (!currentUser) return false;
-    
+
     // Admin can delete any comment
     if (currentUser.role === 'admin') return true;
-    
+
     // User with permission can delete any comment
     if (currentUser.permissions?.can_delete_comments) return true;
-    
+
     // User can delete their own comment if they have permission
-    if (currentUser.permissions?.can_delete_own_comments && comment.created_by === currentUser.email) return true;
-    
+    if (currentUser.permissions?.can_delete_own_comments &&
+      (comment.created_by === currentUser.email || comment.author_name === (currentUser.full_name || currentUser.name))) return true;
+
     return false;
   };
 
-  const filteredUsers = users.filter(u =>
-    u.full_name && u.full_name.toLowerCase().includes(mentionQuery)
-  );
+  const filteredUsers = users.filter(u => {
+    const fullName = u.full_name || u.name || '';
+    const email = u.email || '';
+    const query = mentionQuery.toLowerCase();
+
+    return fullName.toLowerCase().includes(query) ||
+      email.toLowerCase().includes(query);
+  });
 
   return (
     <div className="space-y-4 border-t pt-4">
@@ -170,7 +217,7 @@ export default function Comments({ itemId, itemType, itemName }) {
         <MessageSquare className="w-5 h-5" />
         תגובות ({comments.length})
       </h3>
-      
+
       <form onSubmit={handleSubmit} className="relative">
         <Textarea
           value={newComment}
@@ -179,10 +226,19 @@ export default function Comments({ itemId, itemType, itemName }) {
           className="pr-10"
         />
         <AtSign className="absolute top-3 right-3 w-4 h-4 text-gray-400" />
-        <Button type="submit" size="sm" className="mt-2" disabled={!newComment.trim()}>
-          <Send className="w-4 h-4 ml-2" />
-          שלח
-        </Button>
+        <div className="flex items-center justify-between mt-2">
+          <Button type="submit" size="sm" disabled={!newComment.trim()}>
+            <Send className="w-4 h-4 ml-2" />
+            שלח
+          </Button>
+
+          {showSuccessMessage && (
+            <div className="flex items-center gap-2 text-green-600 text-sm transition-all duration-300 ease-in-out">
+              <CheckCircle className="w-4 h-4" />
+              <span>{successMessage}</span>
+            </div>
+          )}
+        </div>
 
         {showMentions && filteredUsers.length > 0 && (
           <div className="absolute z-10 w-full bg-white border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto">
@@ -192,7 +248,8 @@ export default function Comments({ itemId, itemType, itemName }) {
                 onClick={() => handleMentionSelect(user)}
                 className="p-2 hover:bg-gray-100 cursor-pointer text-sm"
               >
-                {user.full_name}
+                <div className="font-medium">{user.full_name || user.name}</div>
+                {user.email && <div className="text-xs text-gray-500">{user.email}</div>}
               </div>
             ))}
           </div>

@@ -128,9 +128,19 @@ export default function UserManager() {
                 };
             }
         } else {
-            // Create new user
+            // Create new user with consistent ID based on email
+            const generateConsistentUserId = (email) => {
+                let hash = 0;
+                for (let i = 0; i < email.length; i++) {
+                    const char = email.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                }
+                return `user_${Math.abs(hash)}`;
+            };
+
             const newUser = {
-                id: Date.now().toString(),
+                id: generateConsistentUserId(formData.email.trim()),
                 name: formData.name.trim(),
                 email: formData.email.trim(),
                 password: formData.password,
@@ -238,9 +248,9 @@ export default function UserManager() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6" dir="rtl">
             <div className="flex justify-between items-center">
-                <div>
+                <div className="text-right">
                     <h2 className="text-2xl font-bold">ניהול משתמשים</h2>
                     <p className="text-gray-600">נהל את המשתמשים והרשאותיהם במערכת</p>
                 </div>
@@ -252,27 +262,28 @@ export default function UserManager() {
                             משתמש חדש
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-md">
+                    <DialogContent className="max-w-md" dir="rtl">
                         <DialogHeader>
-                            <DialogTitle>
+                            <DialogTitle className="text-right">
                                 {editingUser ? 'עריכת משתמש' : 'משתמש חדש'}
                             </DialogTitle>
                         </DialogHeader>
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="name">שם מלא</Label>
+                                <Label htmlFor="name" className="text-right block">שם מלא</Label>
                                 <Input
                                     id="name"
                                     name="name"
                                     value={formData.name}
                                     onChange={handleInputChange}
                                     placeholder="הזן שם מלא"
+                                    className="text-right"
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="email">כתובת אימייל</Label>
+                                <Label htmlFor="email" className="text-right block">כתובת אימייל</Label>
                                 <Input
                                     id="email"
                                     name="email"
@@ -281,11 +292,12 @@ export default function UserManager() {
                                     onChange={handleInputChange}
                                     placeholder="user@example.com"
                                     dir="ltr"
+                                    className="text-left"
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="password">
+                                <Label htmlFor="password" className="text-right block">
                                     {editingUser ? 'סיסמה חדשה (אופציונלי)' : 'סיסמה'}
                                 </Label>
                                 <div className="relative">
@@ -296,27 +308,27 @@ export default function UserManager() {
                                         value={formData.password}
                                         onChange={handleInputChange}
                                         placeholder={editingUser ? 'השאר ריק כדי לא לשנות' : 'הזן סיסמה (מינימום 6 תווים)'}
-                                        className="pl-10"
+                                        className="pr-10 text-right"
                                     />
                                     <button
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                                     >
                                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                     </button>
                                 </div>
                                 {editingUser && (
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-gray-500 text-right">
                                         השאר ריק כדי לשמור על הסיסמה הנוכחית
                                     </p>
                                 )}
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="role">תפקיד</Label>
+                                <Label htmlFor="role" className="text-right block">תפקיד</Label>
                                 <Select value={formData.role} onValueChange={handleRoleChange}>
-                                    <SelectTrigger>
+                                    <SelectTrigger className="text-right">
                                         <SelectValue placeholder="בחר תפקיד" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -329,16 +341,13 @@ export default function UserManager() {
 
                             {error && (
                                 <Alert className="border-red-200 bg-red-50">
-                                    <AlertDescription className="text-red-700">
+                                    <AlertDescription className="text-red-700 text-right">
                                         {error}
                                     </AlertDescription>
                                 </Alert>
                             )}
 
                             <div className="flex gap-2 pt-4">
-                                <Button type="submit" className="flex-1">
-                                    {editingUser ? 'עדכן' : 'צור משתמש'}
-                                </Button>
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -346,6 +355,9 @@ export default function UserManager() {
                                     className="flex-1"
                                 >
                                     ביטול
+                                </Button>
+                                <Button type="submit" className="flex-1">
+                                    {editingUser ? 'עדכן' : 'צור משתמש'}
                                 </Button>
                             </div>
                         </form>
@@ -355,42 +367,27 @@ export default function UserManager() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <UserIcon className="w-5 h-5" />
+                    <CardTitle className="flex items-center gap-2 justify-end">
                         רשימת משתמשים ({users.length})
+                        <UserIcon className="w-5 h-5" />
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>שם</TableHead>
-                                <TableHead>אימייל</TableHead>
-                                <TableHead>תפקיד</TableHead>
-                                <TableHead>תאריך יצירה</TableHead>
-                                <TableHead>פעולות</TableHead>
+                                <TableHead className="text-right">פעולות</TableHead>
+                                <TableHead className="text-right">תאריך יצירה</TableHead>
+                                <TableHead className="text-right">תפקיד</TableHead>
+                                <TableHead className="text-right">אימייל</TableHead>
+                                <TableHead className="text-right">שם</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {users.map((user) => (
                                 <TableRow key={user.id}>
-                                    <TableCell className="font-medium">{user.name}</TableCell>
-                                    <TableCell className="font-mono text-sm">{user.email}</TableCell>
-                                    <TableCell>{getRoleBadge(user.role)}</TableCell>
-                                    <TableCell className="text-sm text-gray-600">
-                                        {new Date(user.createdAt).toLocaleDateString('he-IL')}
-                                    </TableCell>
                                     <TableCell>
-                                        <div className="flex gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handleEdit(user)}
-                                                className="gap-1"
-                                            >
-                                                <Edit className="w-3 h-3" />
-                                                ערוך
-                                            </Button>
+                                        <div className="flex gap-2 justify-end">
                                             <Button
                                                 variant="destructive"
                                                 size="sm"
@@ -400,8 +397,23 @@ export default function UserManager() {
                                                 <Trash2 className="w-3 h-3" />
                                                 מחק
                                             </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleEdit(user)}
+                                                className="gap-1"
+                                            >
+                                                <Edit className="w-3 h-3" />
+                                                ערוך
+                                            </Button>
                                         </div>
                                     </TableCell>
+                                    <TableCell className="text-sm text-gray-600 text-right">
+                                        {new Date(user.createdAt).toLocaleDateString('he-IL')}
+                                    </TableCell>
+                                    <TableCell className="text-right">{getRoleBadge(user.role)}</TableCell>
+                                    <TableCell className="font-mono text-sm text-left" dir="ltr">{user.email}</TableCell>
+                                    <TableCell className="font-medium text-right">{user.name}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>

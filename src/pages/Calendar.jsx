@@ -9,29 +9,163 @@ import { Calendar as CalendarIcon, CheckSquare, ChevronLeft, ChevronRight, Plus,
 import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth, isToday, getDay } from "date-fns";
 import { he } from "date-fns/locale";
 
-// Hebrew calendar utilities
+const hebrewDays = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
+const hebrewDaysFull = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+
+// Hebrew months
 const hebrewMonths = [
   'תשרי', 'חשון', 'כסלו', 'טבת', 'שבט', 'אדר', 'ניסן', 'אייר', 'סיון', 'תמוז', 'אב', 'אלול'
 ];
 
-const hebrewDays = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
-const hebrewDaysFull = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
-
-// Hebrew date conversion (simplified - for demo purposes)
-const getHebrewDate = (date) => {
-  // This is a simplified Hebrew date calculation
-  // In a real application, you would use a proper Hebrew calendar library
-  const gregorianYear = date.getFullYear();
-  const hebrewYear = gregorianYear + 3760; // Approximate conversion
-  const month = date.getMonth();
-  const day = date.getDate();
+// Hebrew numerals conversion
+const toHebrewNumeral = (num) => {
+  if (!num || num <= 0) return '';
   
-  return {
-    day: day,
-    month: hebrewMonths[month % 12],
-    year: hebrewYear,
-    dayName: hebrewDaysFull[getDay(date)]
+  // Basic numbers 1-30
+  const basicNums = {
+    1: 'א\'', 2: 'ב\'', 3: 'ג\'', 4: 'ד\'', 5: 'ה\'',
+    6: 'ו\'', 7: 'ז\'', 8: 'ח\'', 9: 'ט\'', 10: 'י\'',
+    11: 'י"א', 12: 'י"ב', 13: 'י"ג', 14: 'י"ד', 15: 'ט"ו',
+    16: 'ט"ז', 17: 'י"ז', 18: 'י"ח', 19: 'י"ט', 20: 'כ\'',
+    21: 'כ"א', 22: 'כ"ב', 23: 'כ"ג', 24: 'כ"ד', 25: 'כ"ה',
+    26: 'כ"ו', 27: 'כ"ז', 28: 'כ"ח', 29: 'כ"ט', 30: 'ל\''
   };
+  
+  if (num <= 30) {
+    return basicNums[num] || num.toString();
+  }
+  
+  return num.toString();
+};
+
+// Convert Hebrew year to proper format
+const formatHebrewYear = (year) => {
+  if (!year || year < 5000) return year?.toString() || '';
+  
+  // Current Hebrew year is around 5785 (2025)
+  // We want to display it as ה'תשפ"ה
+  const currentYear = new Date().getFullYear();
+  const hebrewYear = currentYear + 3760;
+  
+  // For now, let's use a simple mapping for current years
+  const yearMappings = {
+    5784: 'ה\'תשפ"ד',
+    5785: 'ה\'תשפ"ה',
+    5786: 'ה\'תשפ"ו',
+    5787: 'ה\'תשפ"ז',
+    5788: 'ה\'תשפ"ח'
+  };
+  
+  return yearMappings[year] || `ה'${year.toString().slice(-3)}`;
+};
+
+// Improved Hebrew date conversion (still approximation but better)
+const getHebrewDate = (date) => {
+  try {
+    const gregorianYear = date.getFullYear();
+    const gregorianMonth = date.getMonth(); // 0-11
+    const gregorianDay = date.getDate();
+    
+    // Better Hebrew year calculation
+    let hebrewYear = gregorianYear + 3760;
+    
+    // Hebrew calendar starts in Tishrei (around September)
+    // If we're before September, we're still in the previous Hebrew year
+    if (gregorianMonth < 8) { // Before September (month 8)
+      hebrewYear = gregorianYear + 3760;
+    } else {
+      hebrewYear = gregorianYear + 3761;
+    }
+    
+    // Better Hebrew month mapping (still approximation)
+    let hebrewMonthIndex;
+    
+    // Map Gregorian months to approximate Hebrew months
+    const monthMapping = {
+      0: 4,  // January -> Shvat
+      1: 5,  // February -> Adar
+      2: 6,  // March -> Nissan
+      3: 7,  // April -> Iyar
+      4: 8,  // May -> Sivan
+      5: 9,  // June -> Tammuz
+      6: 10, // July -> Av
+      7: 11, // August -> Elul
+      8: 0,  // September -> Tishrei
+      9: 1,  // October -> Cheshvan
+      10: 2, // November -> Kislev
+      11: 3  // December -> Tevet
+    };
+    
+    hebrewMonthIndex = monthMapping[gregorianMonth];
+    
+    // Adjust day (this is very approximate)
+    let hebrewDay = gregorianDay;
+    
+    // Simple adjustment - Hebrew months can be 29 or 30 days
+    if (hebrewDay > 29) {
+      hebrewDay = Math.min(hebrewDay, 29);
+    }
+    
+    return {
+      day: hebrewDay,
+      dayHeb: toHebrewNumeral(hebrewDay),
+      month: hebrewMonths[hebrewMonthIndex],
+      monthNum: hebrewMonthIndex,
+      year: hebrewYear,
+      yearHeb: formatHebrewYear(hebrewYear),
+      dayName: hebrewDaysFull[getDay(date)],
+      toString: () => `${toHebrewNumeral(hebrewDay)} ${hebrewMonths[hebrewMonthIndex]} ${formatHebrewYear(hebrewYear)}`
+    };
+  } catch (error) {
+    console.error("Error converting to Hebrew date:", error);
+    return {
+      day: date.getDate(),
+      dayHeb: date.getDate().toString(),
+      month: 'שגיאה',
+      monthNum: 0,
+      year: date.getFullYear(),
+      yearHeb: date.getFullYear().toString(),
+      dayName: hebrewDaysFull[getDay(date)],
+      toString: () => 'שגיאה בתאריך'
+    };
+  }
+};
+
+// Basic Hebrew holidays (simplified list)
+const hebrewHolidays = {
+  // Format: 'MM-DD': [holiday names]
+  '09-15': ['ראש השנה'],
+  '09-16': ['ראש השנה'],
+  '09-24': ['יום כיפור'],
+  '09-29': ['סוכות'],
+  '10-06': ['שמחת תורה'],
+  '12-25': ['חנוכה'],
+  '01-01': ['חנוכה'],
+  '02-15': ['ט"ו בשבט'],
+  '03-14': ['פורים'], // Approximate
+  '04-15': ['פסח'],
+  '04-16': ['פסח'],
+  '04-21': ['פסח'],
+  '04-22': ['פסח'],
+  '05-18': ['ל"ג בעומר'], // Approximate
+  '05-28': ['יום ירושלים'], // Approximate
+  '06-06': ['שבועות'] // Approximate
+};
+
+// Get Hebrew holidays for a date (simplified)
+const getHebrewHolidays = (date) => {
+  const monthDay = format(date, 'MM-dd');
+  const holidays = hebrewHolidays[monthDay] || [];
+  
+  // Add Shabbat
+  if (getDay(date) === 6) { // Saturday
+    holidays.push('שבת');
+  }
+  
+  return holidays.map(holiday => ({
+    desc: holiday,
+    category: holiday === 'שבת' ? 'shabbat' : 'holiday'
+  }));
 };
 
 export default function CalendarPage() {
@@ -42,9 +176,32 @@ export default function CalendarPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState('month'); // month, week, day
   const [showHebrewDates, setShowHebrewDates] = useState(true);
+  const [hebrewCalendarMode, setHebrewCalendarMode] = useState(false);
 
   useEffect(() => {
     loadData();
+
+    // Listen for cloud sync updates
+    const handleCloudSyncUpdate = (e) => {
+      const { entityName } = e.detail;
+      if (entityName === 'events' || entityName === 'tasks') {
+        console.log(`Cloud sync update received for ${entityName}, refreshing calendar...`);
+        loadData();
+      }
+    };
+
+    const handleCloudSyncComplete = () => {
+      console.log('Full cloud sync completed, refreshing calendar...');
+      loadData();
+    };
+
+    window.addEventListener('cloudSyncUpdate', handleCloudSyncUpdate);
+    window.addEventListener('cloudSyncComplete', handleCloudSyncComplete);
+
+    return () => {
+      window.removeEventListener('cloudSyncUpdate', handleCloudSyncUpdate);
+      window.removeEventListener('cloudSyncComplete', handleCloudSyncComplete);
+    };
   }, []);
 
   const loadData = async () => {
@@ -109,10 +266,12 @@ export default function CalendarPage() {
   const renderDay = (date) => {
     const dayEvents = getEventsForDate(date);
     const dayTasks = getTasksForDate(date);
+    const hebrewHolidays = getHebrewHolidays(date);
     const isCurrentMonth = isSameMonth(date, currentDate);
     const isSelectedDate = isSameDay(date, selectedDate);
     const isTodayDate = isToday(date);
     const hebrewDate = getHebrewDate(date);
+    const hasHolidays = hebrewHolidays.length > 0;
 
     return (
       <div
@@ -133,7 +292,7 @@ export default function CalendarPage() {
             </div>
             {showHebrewDates && (
               <div className={`text-xs ${isTodayDate ? 'text-blue-500' : isCurrentMonth ? 'text-gray-500' : 'text-gray-300'}`}>
-                {hebrewDate.day} {hebrewDate.month}
+                {hebrewDate.dayHeb} {hebrewDate.month}
               </div>
             )}
           </div>
@@ -142,9 +301,27 @@ export default function CalendarPage() {
           )}
         </div>
 
+        {/* Hebrew holidays */}
+        {hasHolidays && showHebrewDates && (
+          <div className="mb-2">
+            {hebrewHolidays.slice(0, 1).map((holiday, index) => (
+              <div
+                key={index}
+                className="text-xs px-2 py-1 bg-gradient-to-r from-purple-100 to-purple-50 text-purple-800 rounded-md truncate border-r-2 border-purple-400"
+                title={holiday.desc}
+              >
+                <div className="flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 bg-purple-500 rounded-full flex-shrink-0"></div>
+                  <span className="truncate font-medium">{holiday.desc}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Events and tasks */}
         <div className="space-y-1 flex-grow overflow-hidden">
-          {dayEvents.slice(0, 3).map((event, index) => (
+          {dayEvents.slice(0, hasHolidays ? 2 : 3).map((event, index) => (
             <div
               key={event.id}
               className="text-xs px-2 py-1 bg-gradient-to-r from-green-100 to-green-50 text-green-800 rounded-md truncate border-r-2 border-green-400 hover:shadow-sm transition-shadow"
@@ -157,7 +334,7 @@ export default function CalendarPage() {
             </div>
           ))}
           
-          {dayTasks.slice(0, 2).map((task, index) => (
+          {dayTasks.slice(0, hasHolidays ? 1 : 2).map((task, index) => (
             <div
               key={task.id}
               className="text-xs px-2 py-1 bg-gradient-to-r from-blue-100 to-blue-50 text-blue-800 rounded-md truncate border-r-2 border-blue-400 hover:shadow-sm transition-shadow"
@@ -170,9 +347,9 @@ export default function CalendarPage() {
             </div>
           ))}
           
-          {(dayEvents.length > 3 || dayTasks.length > 2) && (
+          {(dayEvents.length > (hasHolidays ? 2 : 3) || dayTasks.length > (hasHolidays ? 1 : 2) || hebrewHolidays.length > 1) && (
             <div className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded-md">
-              +{Math.max(0, dayEvents.length - 3) + Math.max(0, dayTasks.length - 2)} עוד
+              +{Math.max(0, dayEvents.length - (hasHolidays ? 2 : 3)) + Math.max(0, dayTasks.length - (hasHolidays ? 1 : 2)) + Math.max(0, hebrewHolidays.length - 1)} עוד
             </div>
           )}
         </div>
@@ -203,6 +380,16 @@ export default function CalendarPage() {
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Hebrew calendar mode toggle */}
+          <Button
+            variant={hebrewCalendarMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setHebrewCalendarMode(!hebrewCalendarMode)}
+            className="text-xs"
+          >
+            לוח עברי
+          </Button>
+          
           {/* Hebrew dates toggle */}
           <Button
             variant={showHebrewDates ? "default" : "outline"}
@@ -235,7 +422,14 @@ export default function CalendarPage() {
 
           {/* Current month/year */}
           <h2 className="text-xl font-normal text-gray-900 min-w-[200px] text-center">
-            {format(currentDate, "MMMM yyyy", { locale: he })}
+            {hebrewCalendarMode ? (
+              <div className="flex flex-col items-center">
+                <div>{getHebrewDate(currentDate).month} {getHebrewDate(currentDate).yearHeb}</div>
+                <div className="text-sm text-gray-500">{format(currentDate, "MMMM yyyy", { locale: he })}</div>
+              </div>
+            ) : (
+              format(currentDate, "MMMM yyyy", { locale: he })
+            )}
           </h2>
         </div>
       </div>
@@ -271,12 +465,36 @@ export default function CalendarPage() {
             </div>
             {showHebrewDates && (
               <div className="text-sm text-blue-600 mt-1">
-                {getHebrewDate(selectedDate).day} {getHebrewDate(selectedDate).month} {getHebrewDate(selectedDate).year}
+                {getHebrewDate(selectedDate).toString()}
               </div>
             )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            {/* Hebrew holidays section */}
+            {showHebrewDates && getHebrewHolidays(selectedDate).length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="flex items-center gap-2 font-medium text-gray-900">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                    חגים ומועדים
+                  </h3>
+                  <Badge variant="secondary" className="text-xs">
+                    {getHebrewHolidays(selectedDate).length}
+                  </Badge>
+                </div>
+                
+                <div className="space-y-2">
+                  {getHebrewHolidays(selectedDate).map((holiday, index) => (
+                    <div key={index} className="p-3 bg-purple-50 rounded-lg border border-purple-100 hover:border-purple-200 transition-colors">
+                      <div className="font-medium text-purple-900 text-sm">{holiday.desc}</div>
+                      <div className="text-xs text-purple-700 mt-1 capitalize">{holiday.category}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Events section */}
             <div>
               <div className="flex items-center justify-between mb-3">

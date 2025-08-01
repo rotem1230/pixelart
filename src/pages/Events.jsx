@@ -19,6 +19,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import EventForm from "../components/events/EventForm";
 import EventCard from "../components/events/EventCard";
 import Comments from "../components/shared/Comments"; // Import Comments component
+import AdminTimerOverview from "../components/admin/AdminTimerOverview";
 
 // New Kanban column configurations
 const columnsConfig = {
@@ -93,30 +94,30 @@ function TimerDisplay({ user, onStopTimer }) {
 
   return (
     <Card className="bg-white/90 backdrop-blur-sm shadow-md border border-gray-200">
-      <div className="p-3 flex items-center gap-3">
+      <div className="p-2 sm:p-3 flex items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-2">
           {isTimerActive ?
-          <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div> :
+            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div> :
 
-          <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+            <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
           }
           <Clock className="w-4 h-4 text-gray-600" />
         </div>
-        
-        <div className="flex flex-col min-w-[120px]">
-          <div className="font-mono text-sm font-bold text-gray-900">
+
+        <div className="flex flex-col min-w-[100px] sm:min-w-[120px]">
+          <div className="font-mono text-xs sm:text-sm font-bold text-gray-900">
             {isTimerActive ? getElapsedTime() : "00:00:00"}
           </div>
           <div className="text-xs text-gray-600 truncate">
             {isTimerActive ? user.active_timer_event_name : "לא פעיל"}
           </div>
         </div>
-        
+
         {isTimerActive &&
-        <Button
-          onClick={onStopTimer}
-          size="sm"
-          className="bg-red-600 hover:bg-red-700 h-7 px-2 text-xs">
+          <Button
+            onClick={onStopTimer}
+            size="sm"
+            className="bg-red-600 hover:bg-red-700 h-6 sm:h-7 px-1 sm:px-2 text-xs">
 
             <StopIcon className="w-3 h-3" />
           </Button>
@@ -141,29 +142,84 @@ export default function Events() {
 
   useEffect(() => {
     loadData();
+
+    // Add polling for real-time updates every 10 seconds
+    const interval = setInterval(() => {
+      loadData();
+    }, 10000);
+
+    // Listen for localStorage changes (when other tabs/users update events)
+    const handleStorageChange = (e) => {
+      if (e.key === 'events' || e.key === 'tasks' || e.key === 'systemUsers') {
+        loadData();
+      }
+    };
+
+    // Listen for cloud sync updates
+    const handleCloudSyncUpdate = (e) => {
+      const { entityName } = e.detail;
+      if (entityName === 'events' || entityName === 'tasks' || entityName === 'systemUsers') {
+        console.log(`Cloud sync update received for ${entityName}, refreshing data...`);
+        loadData();
+      }
+    };
+
+    const handleCloudSyncComplete = () => {
+      console.log('Full cloud sync completed, refreshing all data...');
+      loadData();
+    };
+
+    const handleForceUIRefresh = () => {
+      console.log('Force UI refresh triggered, reloading events...');
+      loadData();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('cloudSyncUpdate', handleCloudSyncUpdate);
+    window.addEventListener('cloudSyncComplete', handleCloudSyncComplete);
+    window.addEventListener('forceUIRefresh', handleForceUIRefresh);
+
+    // Listen for visibility change to refresh when user returns to tab
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('cloudSyncUpdate', handleCloudSyncUpdate);
+      window.removeEventListener('cloudSyncComplete', handleCloudSyncComplete);
+      window.removeEventListener('forceUIRefresh', handleForceUIRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
       const [eventsData, tasksData, userData, tagsData, clientsData] = await Promise.all([
-      Event.getAll(),
-      Task.getAll(),
-      User.getCurrentUser().catch(() => null),
-      Tag.getAll(),
-      Client.getAll()
+        Event.getAll(),
+        Task.getAll(),
+        User.getCurrentUser().catch(() => null),
+        Tag.getAll(),
+        Client.getAll()
       ]);
 
       // Filter unarchived events first
       let filteredEvents = eventsData.filter(event => !event.is_archived);
-      
+
       // If user is an operator, show only events assigned to them
       if (userData?.role === 'operator') {
-        filteredEvents = filteredEvents.filter(event => 
-          event.assigned_operator_id === userData.id
+        filteredEvents = filteredEvents.filter(event =>
+          event.assigned_operator_id === userData.id ||
+          event.assigned_operator_id === userData.email // Fallback to email if ID doesn't match
         );
       }
-      
+
       // Group events by their status (which should now correspond to column names)
       const groupedEvents = filteredEvents.reduce((acc, event) => {
         // If event.status is not one of the defined column names, default to the first column
@@ -219,8 +275,8 @@ export default function Events() {
   };
 
   const clientMap = React.useMemo(() =>
-  clients.reduce((acc, client) => ({ ...acc, [client.id]: client.name }), {}),
-  [clients]);
+    clients.reduce((acc, client) => ({ ...acc, [client.id]: client.name }), {}),
+    [clients]);
 
   const operatorMap = React.useMemo(() => {
     const systemUsers = localStorage.getItem('systemUsers');
@@ -249,8 +305,8 @@ export default function Events() {
           }
           // הוסף לעמודה החדשה או עדכן במקום
           newEventsByStatus[newStatus] = oldStatus === newStatus ?
-          (newEventsByStatus[newStatus] || []).map((e) => e.id === updatedEvent.id ? updatedEvent : e) :
-          [...(newEventsByStatus[newStatus] || []), updatedEvent];
+            (newEventsByStatus[newStatus] || []).map((e) => e.id === updatedEvent.id ? updatedEvent : e) :
+            [...(newEventsByStatus[newStatus] || []), updatedEvent];
 
           // Ensure events are sorted after updates if order is relevant, though DND handles sort_order on drag
           // For simple adds/updates, we might not re-sort locally
@@ -361,9 +417,9 @@ export default function Events() {
         try {
           // Mock admin users for now
           const adminUsers = [];
-          
+
           // Send notification to each admin
-          const notificationPromises = adminUsers.map(admin => 
+          const notificationPromises = adminUsers.map(admin =>
             PersonalMessage.create({
               recipient_id: admin.id,
               sender_name: user?.full_name || user?.email || "משתמש",
@@ -374,7 +430,7 @@ export default function Events() {
               priority: "גבוהה"
             })
           );
-          
+
           await Promise.all(notificationPromises);
         } catch (notificationError) {
           console.error("Error sending admin notification:", notificationError);
@@ -406,8 +462,12 @@ export default function Events() {
   };
 
   const handleMarkAsCompleted = async (event) => {
+    console.log("Marking event as completed:", event.name, "Current status:", event.is_completed);
+
     try {
       const updatedEvent = await Event.update(event.id, { is_completed: !event.is_completed });
+      console.log("Event updated:", updatedEvent);
+
       setEventsByStatus((prevEventsByStatus) => {
         const status = columnOrder.includes(event.status) ? event.status : columnOrder[0];
         return {
@@ -415,48 +475,106 @@ export default function Events() {
           [status]: prevEventsByStatus[status].map((e) => e.id === event.id ? updatedEvent : e)
         };
       });
+
+      // Show success message
+      alert(`האירוע ${updatedEvent.is_completed ? 'סומן כהושלם' : 'סומן כלא הושלם'}`);
+
     } catch (error) {
       console.error("Error marking event as completed:", error);
+      alert("שגיאה בעדכון סטטוס האירוע");
       await loadData();
     }
   };
 
   // Function to start the timer for an event
   const handleStartTimer = async (event) => {
+    console.log("Starting timer for event:", event.name, "User:", user);
+
     if (!user) {
       alert("שגיאה: לא ניתן לאתר פרטי משתמש.");
       return;
     }
-    if (user.active_timer_id) {
-      alert("יש לך כבר טיימר שרץ על אירוע אחר.");
-      return;
-    }
+    // Allow multiple timers - removed restriction
+
     try {
+      console.log("Creating work hour entry...");
+      console.log("WorkHoursEntity:", WorkHoursEntity);
+      console.log("Available methods:", Object.keys(WorkHoursEntity));
+
       const newWorkHour = await WorkHoursEntity.create({
         event_id: event.id,
-        user_id: user.id,
+        user_id: user.id || user.email, // Fallback to email if no ID
         date: format(new Date(), 'yyyy-MM-dd'),
         start_time: format(new Date(), 'HH:mm:ss'),
         status: "בתהליך"
       });
-      const updatedUser = { 
-        ...user, 
+
+      console.log("Work hour created:", newWorkHour);
+
+      const timerStartTime = new Date();
+      const updatedUser = {
+        ...user,
         active_timer_id: newWorkHour.id,
         active_timer_event_id: event.id,
-        active_timer_event_name: event.name
+        active_timer_event_name: event.name,
+        active_timer_start_time: timerStartTime.toISOString()
       };
+
+      // Update current user in localStorage
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
       setUser(updatedUser);
-      // Instead of reloading all data, just update the user state locally
-      setUser((prevUser) => ({
-        ...prevUser,
-        active_timer_id: newWorkHour.id,
-        active_timer_event_id: event.id,
-        active_timer_event_name: event.name
-      }));
+
+      // Update the user in systemUsers as well - this is critical for admin visibility
+      try {
+        const systemUsers = JSON.parse(localStorage.getItem('systemUsers') || '[]');
+        const updatedSystemUsers = systemUsers.map(u => {
+          if (u.id === user.id || u.email === user.email) {
+            return { ...u, ...updatedUser };
+          }
+          return u;
+        });
+
+        // If user not found in systemUsers, add them
+        const userExists = systemUsers.some(u => u.id === user.id || u.email === user.email);
+        if (!userExists) {
+          updatedSystemUsers.push(updatedUser);
+        }
+
+        localStorage.setItem('systemUsers', JSON.stringify(updatedSystemUsers));
+        console.log('Updated systemUsers with timer info:', updatedSystemUsers);
+
+        // Trigger storage event for other components to update
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'systemUsers',
+          newValue: JSON.stringify(updatedSystemUsers)
+        }));
+
+      } catch (error) {
+        console.warn('Could not update systemUsers:', error);
+      }
+
+      // Also try to update via API if available
+      try {
+        await User.update(user.id, updatedUser);
+        console.log('User updated via API');
+      } catch (apiError) {
+        console.warn('Could not update user via API:', apiError);
+      }
+
+      console.log("Timer started successfully");
+      alert(`טיימר הופעל בהצלחה עבור אירוע: ${event.name}`);
+
     } catch (error) {
       console.error("Error starting timer:", error);
-      alert("שגיאה בהפעלת הטיימר.");
+
+      // More specific error messages
+      if (error.message?.includes('WorkHours')) {
+        alert("שגיאה ביצירת רישום שעות עבודה. אנא נסה שוב.");
+      } else if (error.message?.includes('create')) {
+        alert("שגיאה בשמירת הנתונים. אנא בדוק את החיבור למערכת.");
+      } else {
+        alert(`שגיאה בהפעלת הטיימר: ${error.message || 'שגיאה לא ידועה'}`);
+      }
     }
   };
 
@@ -481,31 +599,59 @@ export default function Events() {
       });
 
       // Clear active timer from user profile
-      const updatedUser = { 
-        ...user, 
+      const updatedUser = {
+        ...user,
         active_timer_id: null,
         active_timer_event_id: null,
-        active_timer_event_name: null
+        active_timer_event_name: null,
+        active_timer_start_time: null
       };
+
+      // Update current user in localStorage
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
       setUser(updatedUser);
 
-      // Update local user state
-      setUser(prevUser => ({
-        ...prevUser,
-        active_timer_id: null,
-        active_timer_event_id: null,
-        active_timer_event_name: null
-      }));
+      // Update systemUsers to reflect timer stop
+      try {
+        const systemUsers = JSON.parse(localStorage.getItem('systemUsers') || '[]');
+        const updatedSystemUsers = systemUsers.map(u => {
+          if (u.id === user.id || u.email === user.email) {
+            return { ...u, ...updatedUser };
+          }
+          return u;
+        });
+        localStorage.setItem('systemUsers', JSON.stringify(updatedSystemUsers));
+        console.log('Updated systemUsers after stopping timer:', updatedSystemUsers);
+
+        // Trigger storage event for other components to update
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'systemUsers',
+          newValue: JSON.stringify(updatedSystemUsers)
+        }));
+
+      } catch (error) {
+        console.warn('Could not update systemUsers:', error);
+      }
+
+      // Also try to update via API if available
+      try {
+        await User.update(user.id, updatedUser);
+        console.log('User updated via API after stopping timer');
+      } catch (apiError) {
+        console.warn('Could not update user via API:', apiError);
+      }
 
       // Close selected event modal if open
       if (selectedEvent) {
         setSelectedEvent(null);
       }
 
+      const eventName = user.active_timer_event_name || 'האירוע';
+      alert(`הטיימר נעצר בהצלחה. זמן עבודה: ${Math.floor(hoursWorked)}:${String(Math.floor((hoursWorked % 1) * 60)).padStart(2, '0')} שעות על ${eventName}`);
+
     } catch (error) {
       console.error("Error stopping timer:", error);
-      
+
       // More specific error handling
       if (error.message?.includes('WorkHours')) {
         alert("שגיאה בעדכון רישום השעות. אנא נסה שוב.");
@@ -596,38 +742,44 @@ export default function Events() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6" dir="rtl">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6" dir="rtl">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
             ניהול אירועים
           </h1>
         </div>
 
-        <div className="flex items-center gap-4">
-            <TimerDisplay user={user} onStopTimer={handleStopTimer} />
+        <div className="flex items-center gap-4 w-full sm:w-auto">
+          <TimerDisplay user={user} onStopTimer={handleStopTimer} />
+          {isAdmin && (
+            <AdminTimerOverview
+              key={`admin-timer-${Date.now()}`}
+              currentUser={user}
+            />
+          )}
           <Button
             onClick={() => setShowForm(true)}
             className="gap-2 bg-green-600 hover:bg-green-700">
-                <Plus className="w-4 h-4" />
-                אירוע חדש
+            <Plus className="w-4 h-4" />
+            אירוע חדש
           </Button>
         </div>
       </div>
 
       {/* Event Form */}
       {showForm &&
-      <EventForm
-        event={editingEvent}
-        onSubmit={handleEventSubmit}
-        onCancel={() => {
-          setShowForm(false);
-          setEditingEvent(null);
-        }}
-        clients={clients} // Pass clients to the form
-        onClientAdded={handleAddNewClient} // Pass the new client add handler
-        isAdmin={isAdmin} />
+        <EventForm
+          event={editingEvent}
+          onSubmit={handleEventSubmit}
+          onCancel={() => {
+            setShowForm(false);
+            setEditingEvent(null);
+          }}
+          clients={clients} // Pass clients to the form
+          onClientAdded={handleAddNewClient} // Pass the new client add handler
+          isAdmin={isAdmin} />
 
       }
 
@@ -635,8 +787,8 @@ export default function Events() {
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-6 overflow-x-auto pb-4">
           {isLoading ?
-          Array(4).fill(0).map((_, colIdx) =>
-          <div key={colIdx} className="flex-shrink-0 w-80">
+            Array(4).fill(0).map((_, colIdx) =>
+              <div key={colIdx} className="flex-shrink-0 w-80">
                 <Card className="bg-gray-50 border-gray-200 animate-pulse">
                   <CardHeader className="pb-3">
                     <div className="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -644,25 +796,25 @@ export default function Events() {
                   </CardHeader>
                   <CardContent className="space-y-3 p-2">
                     {Array(3).fill(0).map((_, cardIdx) =>
-                <div key={cardIdx} className="p-4 bg-gray-200 rounded-md h-32"></div>
-                )}
+                      <div key={cardIdx} className="p-4 bg-gray-200 rounded-md h-32"></div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
-          ) :
+            ) :
 
-          columnOrder.map((columnId) => {
-            const column = { id: columnId, title: columnId };
-            const events = eventsByStatus[column.id] || [];
-            const config = columnsConfig[column.id];
+            columnOrder.map((columnId) => {
+              const column = { id: columnId, title: columnId };
+              const events = eventsByStatus[column.id] || [];
+              const config = columnsConfig[column.id];
 
-            return (
-              <Droppable key={column.id} droppableId={column.id}>
+              return (
+                <Droppable key={column.id} droppableId={column.id}>
                   {(provided, snapshot) =>
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className={`flex-shrink-0 w-80 rounded-lg ${snapshot.isDraggingOver ? 'bg-green-50' : 'bg-gray-50'}`}>
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`flex-shrink-0 w-72 sm:w-80 rounded-lg ${snapshot.isDraggingOver ? 'bg-green-50' : 'bg-gray-50'}`}>
 
                       <Card className="bg-transparent border-0 h-full flex flex-col">
                         <CardHeader className={`pb-3 border-b-2 ${config?.borderColor || 'border-gray-300'}`}>
@@ -677,38 +829,38 @@ export default function Events() {
                         </CardHeader>
                         <CardContent className="p-2 space-y-3 flex-1 overflow-y-auto">
                           {events.length === 0 ?
-                      <p className="text-center text-gray-500 text-sm py-4">אין אירועים בעמודה זו</p> :
+                            <p className="text-center text-gray-500 text-sm py-4">אין אירועים בעמודה זו</p> :
 
-                      events.map((event, index) =>
-                      <Draggable key={event.id} draggableId={event.id} index={index}>
+                            events.map((event, index) =>
+                              <Draggable key={event.id} draggableId={event.id} index={index}>
                                 {(provided, snapshot) =>
-                        <EventCard
-                          provided={provided}
-                          snapshot={snapshot}
-                          event={event}
-                          onEdit={() => handleEditEvent(event)}
-                          onArchive={() => handleArchiveEvent(event.id)}
-                          onSelect={() => setSelectedEvent(event)}
-                          onMarkComplete={handleMarkAsCompleted}
-                          tagColors={tagColors}
-                          clientName={clientMap[event.client_id]} // Pass client name
-                          operatorName={operatorMap[event.assigned_operator_id]} // Pass operator name
-                          statusColors={columnsConfig}
-                          user={user}
-                          // Timer props are handled via the modal
-                        />
-                        }
+                                  <EventCard
+                                    provided={provided}
+                                    snapshot={snapshot}
+                                    event={event}
+                                    onEdit={() => handleEditEvent(event)}
+                                    onArchive={() => handleArchiveEvent(event.id)}
+                                    onSelect={() => setSelectedEvent(event)}
+                                    onMarkComplete={handleMarkAsCompleted}
+                                    onStartTimer={handleStartTimer}
+                                    tagColors={tagColors}
+                                    clientName={clientMap[event.client_id]} // Pass client name
+                                    operatorName={operatorMap[event.assigned_operator_id]} // Pass operator name
+                                    statusColors={columnsConfig}
+                                    user={user}
+                                  />
+                                }
                               </Draggable>
-                      )
-                      }
+                            )
+                          }
                           {provided.placeholder}
                         </CardContent>
                       </Card>
                     </div>
-                }
+                  }
                 </Droppable>);
 
-          })
+            })
           }
         </div>
       </DragDropContext>
@@ -729,263 +881,267 @@ export default function Events() {
                 <div className="flex items-center gap-3 flex-1">
                   <h2 className="text-2xl font-bold flex-1 text-right">{selectedEvent.name}</h2>
                   {clientMap[selectedEvent.client_id] &&
-                <Badge variant="outline" className="text-sm border-cyan-300 bg-cyan-50 text-cyan-800">
+                    <Badge variant="outline" className="text-sm border-cyan-300 bg-cyan-50 text-cyan-800">
                       {clientMap[selectedEvent.client_id]}
                     </Badge>
-                }
+                  }
                 </div>
                 <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSelectedEvent(null)}
-                className="p-1">
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSelectedEvent(null)}
+                  className="p-1">
 
-                    <X className="w-5 h-5" />
+                  <X className="w-5 h-5" />
                 </Button>
               </div>
 
               {(isAdmin || user?.permissions?.can_edit_events || user?.permissions?.can_delete_events) &&
-            <div className="flex gap-2 mb-4 pb-4 border-b">
+                <div className="flex gap-2 mb-4 pb-4 border-b">
                   {(isAdmin || user?.permissions?.can_edit_events) &&
-              <Button
-                onClick={() => handleEditEvent(selectedEvent)}
-                className="gap-2 bg-blue-600 hover:bg-blue-700">
+                    <Button
+                      onClick={() => handleEditEvent(selectedEvent)}
+                      className="gap-2 bg-blue-600 hover:bg-blue-700">
 
                       <Edit className="w-4 h-4" />
                       ערוך אירוע
                     </Button>
-              }
+                  }
                   {(isAdmin || user?.permissions?.can_delete_events) &&
-              <Button
-                onClick={() => handleDeleteEvent(selectedEvent.id)} // Changed from Archive to Delete
-                variant="destructive"
-                className="gap-2">
+                    <Button
+                      onClick={() => handleDeleteEvent(selectedEvent.id)} // Changed from Archive to Delete
+                      variant="destructive"
+                      className="gap-2">
 
                       <Trash2 className="w-4 h-4" />
                       מחק אירוע
                     </Button>
-              }
+                  }
                   {(isAdmin || user?.permissions?.can_delete_events) && // Added Archive back as separate button
-              <Button
-                onClick={() => handleArchiveEvent(selectedEvent.id)}
-                variant="outline"
-                className="gap-2 border-orange-300 text-orange-700 hover:bg-orange-50">
+                    <Button
+                      onClick={() => handleArchiveEvent(selectedEvent.id)}
+                      variant="outline"
+                      className="gap-2 border-orange-300 text-orange-700 hover:bg-orange-50">
 
                       <Archive className="w-4 h-4" />
                       העבר לארכיון
                     </Button>
-              }
+                  }
                 </div>
-            }
+              }
 
               <div className="space-y-4" dir="rtl">
                 {/* Event Status Badge */}
                 {selectedEvent.status && columnsConfig[selectedEvent.status] &&
-              <Badge className={`${columnsConfig[selectedEvent.status].color} border-0`}>
+                  <Badge className={`${columnsConfig[selectedEvent.status].color} border-0`}>
                     {selectedEvent.status}
                   </Badge>
-              }
+                }
 
                 <div className="flex items-center gap-2 text-lg justify-start">
                   <Calendar className="w-5 h-5 text-gray-500" />
                   <span>{format(new Date(selectedEvent.date), "d בMMMM yyyy", { locale: he })}</span>
                 </div>
-                
+
                 {selectedEvent.audience_arrival_time &&
-              <div className="flex items-center gap-2 justify-start">
+                  <div className="flex items-center gap-2 justify-start">
                     <Clock className="w-4 h-4 text-gray-500" />
                     <span>כניסת קהל: {selectedEvent.audience_arrival_time}</span>
                   </div>
-              }
+                }
 
                 {selectedEvent.location &&
-              <div className="flex items-center gap-2 justify-start">
+                  <div className="flex items-center gap-2 justify-start">
                     <MapPin className="w-4 h-4 text-gray-500" />
                     <span>{selectedEvent.location}</span>
                   </div>
-              }
+                }
 
                 {selectedEvent.drive_url &&
-              <a href={selectedEvent.drive_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-green-600 hover:text-green-800 justify-start">
-                      <ExternalLink className="w-4 h-4" />
-                      <span>פתח ב-Google Drive</span>
-                    </a>
-              }
+                  <a href={selectedEvent.drive_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-green-600 hover:text-green-800 justify-start">
+                    <ExternalLink className="w-4 h-4" />
+                    <span>פתח ב-Google Drive</span>
+                  </a>
+                }
 
                 {selectedEvent.description &&
-              <p className="text-gray-700 text-right">{selectedEvent.description}</p>
-              }
+                  <p className="text-gray-700 text-right">{selectedEvent.description}</p>
+                }
 
                 {/* Assigned Operator */}
                 {selectedEvent.assigned_operator_id && operatorMap[selectedEvent.assigned_operator_id] &&
-              <div className="border-t pt-4">
+                  <div className="border-t pt-4">
                     <h3 className="font-semibold mb-2 text-right">מפעיל מוקצה</h3>
                     <p className="text-gray-700 text-right">
                       <span className="font-medium">שם: </span>
                       {operatorMap[selectedEvent.assigned_operator_id]}
                     </p>
                   </div>
-              }
+                }
 
                 {/* Producer Information */}
                 {(selectedEvent.producer_name || selectedEvent.producer_phone) &&
-              <div className="border-t pt-4">
+                  <div className="border-t pt-4">
                     <h3 className="font-semibold mb-2 text-right">פרטי מפיק</h3>
                     {selectedEvent.producer_name &&
-                  <p className="text-gray-700 text-right mb-1">
+                      <p className="text-gray-700 text-right mb-1">
                         <span className="font-medium">שם: </span>
                         {selectedEvent.producer_name}
                       </p>
-                  }
+                    }
                     {selectedEvent.producer_phone &&
-                  <p className="text-gray-700 text-right">
+                      <p className="text-gray-700 text-right">
                         <span className="font-medium">טלפון: </span>
                         <span dir="ltr">{selectedEvent.producer_phone}</span>
                       </p>
-                  }
+                    }
                   </div>
-              }
+                }
 
                 {/* Registration Notes */}
                 {selectedEvent.registration_notes &&
-              <div className="border-t pt-4">
+                  <div className="border-t pt-4">
                     <h3 className="font-semibold mb-2 text-right">הערות עמודת רישום</h3>
                     <p className="text-gray-700 text-right whitespace-pre-wrap">{selectedEvent.registration_notes}</p>
                   </div>
-              }
+                }
 
                 {selectedEvent.tags && selectedEvent.tags.length > 0 &&
-              <div className="flex flex-wrap gap-2 justify-end">
+                  <div className="flex flex-wrap gap-2 justify-end">
                     {selectedEvent.tags.map((tag, index) =>
-                <Badge
-                  key={index}
-                  variant="outline"
-                  style={tagColors[tag]}>
+                      <Badge
+                        key={index}
+                        variant="outline"
+                        style={tagColors[tag]}>
 
                         {tag}
                       </Badge>
-                )}
+                    )}
                   </div>
-              }
+                }
 
                 {/* Checklist Section */}
                 {selectedEvent.checklist && selectedEvent.checklist.length > 0 &&
-              <div className="border-t pt-4">
-                        <h3 className="font-semibold mb-2 text-right">צ'קליסט</h3>
-                        <div className="space-y-2">
-                            {selectedEvent.checklist.map((checkItem, index) =>
-                  <div key={index} className="flex items-center gap-2 justify-end">
-                                    <label
-                      htmlFor={`checklist-${index}`}
-                      className={`text-sm ${checkItem.completed ? 'line-through text-gray-500' : ''}`}>
+                  <div className="border-t pt-4">
+                    <h3 className="font-semibold mb-2 text-right">צ'קליסט</h3>
+                    <div className="space-y-2">
+                      {selectedEvent.checklist.map((checkItem, index) =>
+                        <div key={index} className="flex items-center gap-2 justify-end">
+                          <label
+                            htmlFor={`checklist-${index}`}
+                            className={`text-sm ${checkItem.completed ? 'line-through text-gray-500' : ''}`}>
 
-                                        {checkItem.item}
-                                    </label>
-                                    <Checkbox
-                      id={`checklist-${index}`}
-                      checked={checkItem.completed}
-                      onCheckedChange={() => handleChecklistItemToggle(selectedEvent, index)} />
+                            {checkItem.item}
+                          </label>
+                          <Checkbox
+                            id={`checklist-${index}`}
+                            checked={checkItem.completed}
+                            onCheckedChange={() => handleChecklistItemToggle(selectedEvent, index)} />
 
-                                </div>
-                  )}
                         </div>
+                      )}
                     </div>
-              }
+                  </div>
+                }
 
                 {/* Manager Tracking Section */}
                 {isAdmin &&
-              <div className="border-t pt-4">
+                  <div className="border-t pt-4">
                     <h3 className="font-semibold mb-3 text-right">מעקב מנהל</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                        <div className="space-y-1"><div className="text-gray-500">סטטוס אישור</div><div className="font-medium">{selectedEvent.approval_status || "לא צוין"}</div></div>
-                        <div className="space-y-1"><div className="text-gray-500">הצעת מחיר</div><div className="font-medium">{selectedEvent.quote_number || "לא צוין"}</div></div>
-                        <div className="space-y-1"><div className="text-gray-500">סטטוס דילים</div><div className="font-medium">{selectedEvent.booking_status || "לא צוין"}</div></div>
-                        <div className="space-y-1"><div className="text-gray-500">סטטוס תשלום</div><div className="font-medium">{selectedEvent.payment_status || "לא צוין"}</div></div>
+                      <div className="space-y-1"><div className="text-gray-500">סטטוס אישור</div><div className="font-medium">{selectedEvent.approval_status || "לא צוין"}</div></div>
+                      <div className="space-y-1"><div className="text-gray-500">הצעת מחיר</div><div className="font-medium">{selectedEvent.quote_number || "לא צוין"}</div></div>
+                      <div className="space-y-1"><div className="text-gray-500">סטטוס דילים</div><div className="font-medium">{selectedEvent.booking_status || "לא צוין"}</div></div>
+                      <div className="space-y-1"><div className="text-gray-500">סטטוס תשלום</div><div className="font-medium">{selectedEvent.payment_status || "לא צוין"}</div></div>
                     </div>
                     {selectedEvent.manager_checklist && selectedEvent.manager_checklist.length > 0 &&
-                <div>
+                      <div>
                         <h4 className="font-semibold mb-2 text-right">צ'קליסט מנהל</h4>
                         <div className="space-y-2">
-                            {selectedEvent.manager_checklist.map((checkItem, index) =>
-                    <div key={index} className="flex items-center gap-2 justify-end">
-                                    <label htmlFor={`manager-checklist-${index}`} className={`text-sm ${checkItem.completed ? 'line-through text-gray-500' : ''}`}>{checkItem.item}</label>
-                                    <Checkbox id={`manager-checklist-${index}`} checked={checkItem.completed} onCheckedChange={() => handleManagerChecklistItemToggle(selectedEvent, index)} />
-                                </div>
-                    )}
+                          {selectedEvent.manager_checklist.map((checkItem, index) =>
+                            <div key={index} className="flex items-center gap-2 justify-end">
+                              <label htmlFor={`manager-checklist-${index}`} className={`text-sm ${checkItem.completed ? 'line-through text-gray-500' : ''}`}>{checkItem.item}</label>
+                              <Checkbox id={`manager-checklist-${index}`} checked={checkItem.completed} onCheckedChange={() => handleManagerChecklistItemToggle(selectedEvent, index)} />
+                            </div>
+                          )}
                         </div>
                       </div>
-                }
+                    }
                   </div>
-              }
+                }
 
                 {/* Screen Grid Section */}
                 {(selectedEvent.screen_grid_image_url || selectedEvent.screen_grid_text) &&
-              <div className="border-t pt-4">
-                        <h3 className="font-semibold mb-2 text-right">גריד מסך</h3>
-                        {selectedEvent.screen_grid_image_url &&
-                <div className="mb-2">
-                                <img src={selectedEvent.screen_grid_image_url} alt="גריד מסך" className="max-w-full rounded-md shadow-md" />
-                            </div>
+                  <div className="border-t pt-4">
+                    <h3 className="font-semibold mb-2 text-right">גריד מסך</h3>
+                    {selectedEvent.screen_grid_image_url &&
+                      <div className="mb-2">
+                        <img src={selectedEvent.screen_grid_image_url} alt="גריד מסך" className="max-w-full rounded-md shadow-md" />
+                      </div>
+                    }
+                    {selectedEvent.screen_grid_text &&
+                      <p className="text-gray-700 bg-gray-50 p-3 rounded-md text-right">{selectedEvent.screen_grid_text}</p>
+                    }
+                  </div>
                 }
-                        {selectedEvent.screen_grid_text &&
-                <p className="text-gray-700 bg-gray-50 p-3 rounded-md text-right">{selectedEvent.screen_grid_text}</p>
-                }
-                    </div>
-              }
 
                 <div className="border-t pt-4">
                   <h3 className="font-semibold mb-2 text-right">משימות קשורות ({getEventTasks(selectedEvent.id).length})</h3>
                   <div className="space-y-2">
                     {getEventTasks(selectedEvent.id).length === 0 ?
-                  <p className="text-gray-500 text-sm text-right">אין משימות משויכות לאירוע זה.</p> :
+                      <p className="text-gray-500 text-sm text-right">אין משימות משויכות לאירוע זה.</p> :
 
-                  getEventTasks(selectedEvent.id).map((task) =>
-                  <div key={task.id} className="p-3 bg-gray-50 rounded-lg text-right">
+                      getEventTasks(selectedEvent.id).map((task) =>
+                        <div key={task.id} className="p-3 bg-gray-50 rounded-lg text-right">
                           <div className="font-medium">{task.description}</div>
                           <div className="text-sm text-gray-500">
                             סטטוס: {task.status} | אחראי: {task.assigned_user || "לא משויך"}
                           </div>
                         </div>
-                  )
-                  }
+                      )
+                    }
                   </div>
                 </div>
 
                 {/* New Time Tracking Section */}
                 <div className="border-t pt-4 mt-4">
-                    <h3 className="font-semibold mb-3 text-right">מעקב שעות</h3>
-                    {user && (() => {
-                  if (user.active_timer_id) {
-                    if (user.active_timer_event_id === selectedEvent.id) {
-                      return (
-                        <Button onClick={handleStopTimer} className="w-full bg-red-600 hover:bg-red-700 gap-2">
-                                        <StopIcon className="w-4 h-4" />
-                                        הפסק טיימר
-                                    </Button>);
+                  <h3 className="font-semibold mb-3 text-right">מעקב שעות</h3>
+                  {user ? (() => {
+                    if (user.active_timer_id) {
+                      if (user.active_timer_event_id === selectedEvent.id) {
+                        return (
+                          <Button onClick={handleStopTimer} className="w-full bg-red-600 hover:bg-red-700 gap-2">
+                            <StopIcon className="w-4 h-4" />
+                            הפסק טיימר
+                          </Button>);
 
+                      } else {
+                        return (
+                          <Button disabled className="w-full gap-2 bg-gray-200 text-gray-700">
+                            <Clock className="w-4 h-4" />
+                            טיימר פעיל באירוע: {user.active_timer_event_name}
+                          </Button>);
+
+                      }
                     } else {
                       return (
-                        <Button disabled className="w-full gap-2 bg-gray-200 text-gray-700">
-                                        <Clock className="w-4 h-4" />
-                                        טיימר פעיל באירוע: {user.active_timer_event_name}
-                                    </Button>);
+                        <Button onClick={() => handleStartTimer(selectedEvent)} className="w-full bg-green-600 hover:bg-green-700 gap-2">
+                          <Play className="w-4 h-4" />
+                          הפעל טיימר
+                        </Button>);
 
                     }
-                  } else {
-                    return (
-                      <Button onClick={() => handleStartTimer(selectedEvent)} className="w-full bg-green-600 hover:bg-green-700 gap-2">
-                                    <Play className="w-4 h-4" />
-                                    הפעל טיימר
-                                </Button>);
-
-                  }
-                })()}
+                  })() : (
+                    <div className="text-center text-gray-500 py-4">
+                      טוען נתוני משתמש...
+                    </div>
+                  )}
                 </div>
 
                 {/* Comments Section */}
-                <Comments 
-                  itemId={selectedEvent.id} 
-                  itemType="event" 
+                <Comments
+                  itemId={selectedEvent.id}
+                  itemType="event"
                   itemName={selectedEvent.name}
                 />
               </div>

@@ -156,3 +156,50 @@ button:focus-visible {
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /* Mobile-specific utilities */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  .mobile-padding {
+    @apply p-4 sm:p-6 lg:p-8;
+  }
+
+  .mobile-spacing {
+    @apply space-y-4 sm:space-y-6;
+  }
+
+  .mobile-text {
+    @apply text-sm sm:text-base;
+  }
+
+  .mobile-heading {
+    @apply text-2xl sm:text-3xl lg:text-4xl;
+  }
+
+  .mobile-button {
+    @apply h-10 sm:h-11 px-4 sm:px-6 text-sm sm:text-base;
+  }
+
+  .mobile-input {
+    @apply h-10 sm:h-11 text-base;
+  }
+
+  .mobile-card-padding {
+    @apply p-3 sm:p-4 lg:p-6;
+  }
+
+  .mobile-grid {
+    @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  }
+
+  .mobile-flex {
+    @apply flex-col sm:flex-row;
+  }
+
+  .mobile-gap {
+    @apply gap-4 sm:gap-6;
+  }
+}

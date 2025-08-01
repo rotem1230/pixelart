@@ -168,16 +168,16 @@ export default function WorkHours() {
   const averageHours = filteredWorkHours.length > 0 ? (totalHours / filteredWorkHours.length).toFixed(1) : '0';
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
             שעות עבודה
           </h1>
         </div>
-        
-        <div className="flex gap-3">
+
+        <div className="flex gap-3 w-full sm:w-auto">
           <Button
             onClick={handleExportToExcel}
             variant="outline"
@@ -256,7 +256,7 @@ export default function WorkHours() {
       </Card>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-green-900">

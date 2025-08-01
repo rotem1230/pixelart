@@ -24,8 +24,67 @@ export default function SeasonalClientsTable({ clients, onEdit, onDelete, isLoad
           רשימת מעקב לקוחות עונתיים ({clients.length})
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
+      <CardContent className="p-3 sm:p-6">
+        {/* Mobile Card Layout */}
+        <div className="block sm:hidden space-y-3">
+          {isLoading ? (
+            Array(3).fill(0).map((_, i) => (
+              <Card key={i} className="border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="h-4 bg-gray-200 animate-pulse rounded-md w-32 mb-2"></div>
+                  <div className="h-3 bg-gray-200 animate-pulse rounded-md w-24 mb-2"></div>
+                  <div className="h-3 bg-gray-200 animate-pulse rounded-md w-20"></div>
+                </CardContent>
+              </Card>
+            ))
+          ) : clients.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              לא נמצאו רשומות במערכת המעקב.
+            </div>
+          ) : (
+            clients.map(client => (
+              <Card key={client.id} className="border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-medium text-gray-900">{client.event_name}</h3>
+                        <Badge className={`${statusColors[client.check_status] || 'bg-gray-100'} text-xs`}>
+                          {client.check_status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-1">לקוח: {client.client_name}</p>
+                      <p className="text-sm text-gray-600 mb-1">חודש: {client.event_month}</p>
+                      {client.next_contact_date && (
+                        <p className="text-sm text-gray-500">
+                          פנייה הבאה: {format(new Date(client.next_contact_date), 'd/MM/yy', { locale: he })}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      {client.drive_link && (
+                        <a href={client.drive_link} target="_blank" rel="noopener noreferrer">
+                          <Button variant="ghost" size="sm">
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
+                        </a>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => onEdit(client)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => onDelete(client.id)} className="text-red-600 hover:text-red-700">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table Layout */}
+        <div className="hidden sm:block overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

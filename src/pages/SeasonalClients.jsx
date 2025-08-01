@@ -106,16 +106,16 @@ export default function SeasonalClients() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6" dir="rtl">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6" dir="rtl">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-            <Repeat className="w-8 h-8 text-teal-600" />
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2 sm:gap-3">
+            <Repeat className="w-6 sm:w-8 h-6 sm:h-8 text-teal-600" />
             מעקב לקוחות עונתיים
           </h1>
-          <p className="text-gray-600">נהל ועקוב אחר לקוחות ואירועים החוזרים על בסיס קבוע.</p>
+          <p className="text-sm sm:text-base text-gray-600">נהל ועקוב אחר לקוחות ואירועים החוזרים על בסיס קבוע.</p>
         </div>
-        <Button onClick={() => { setEditingClient(null); setShowForm(true); }} className="gap-2 bg-green-600 hover:bg-green-700">
+        <Button onClick={() => { setEditingClient(null); setShowForm(true); }} className="gap-2 bg-green-600 hover:bg-green-700 w-full sm:w-auto">
           <Plus className="w-4 h-4" />
           הוסף למעקב
         </Button>
